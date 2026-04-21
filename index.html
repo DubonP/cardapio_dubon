@@ -548,7 +548,7 @@
       }
 
       .cart-form {
-        padding: 12px 20px;
+        padding: 12px 20px 32px;
         border-top: 1px solid var(--border);
         flex-shrink: 0;
       }
@@ -1113,7 +1113,9 @@
           descDiv.className = "preco-info";
 
           if (cat.tipo === "pote") {
-            descDiv.innerHTML = `${cat.descricao_categoria} — <span class="price-tag">${fmt(cat.preco_unico)} / pote</span>`;
+            const unidade = cat.unidade_label !== undefined ? cat.unidade_label : "pote";
+            const precoLabel = unidade ? `${fmt(cat.preco_unico)} / ${unidade}` : fmt(cat.preco_unico);
+            descDiv.innerHTML = `${cat.descricao_categoria} — <span class="price-tag">${precoLabel}</span>`;
           } else {
             descDiv.textContent = cat.descricao_categoria;
             const p = cat.precos_quantidade;

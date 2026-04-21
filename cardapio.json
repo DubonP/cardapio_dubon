@@ -158,6 +158,7 @@
       "nome": "Milk-shake 400ml",
       "emoji": "🥤",
       "preco_unico": 25.00,
+      "unidade_label": "",
       "tipo": "pote",
       "descricao_categoria": "Escolha um sabor",
       "produtos": [
@@ -184,6 +185,7 @@
       "nome": "Coberturas 300g",
       "emoji": "🍓",
       "preco_unico": 15.00,
+      "unidade_label": "",
       "tipo": "pote",
       "descricao_categoria": "Escolha um sabor",
       "produtos": [
@@ -196,6 +198,7 @@
       "nome": "Pacote de Cascão Biju",
       "emoji": "🍪",
       "preco_unico": 8.00,
+      "unidade_label": "pacote",
       "tipo": "pote",
       "descricao_categoria": "Pacote com 10 unidades",
       "produtos": [
@@ -206,6 +209,7 @@
       "nome": "Pacote de Cesta Biju",
       "emoji": "🧺",
       "preco_unico": 5.00,
+      "unidade_label": "pacote",
       "tipo": "pote",
       "descricao_categoria": "Pacote com 5 unidades",
       "produtos": [
