@@ -192,16 +192,19 @@
       .picole-flavor-row {
         display: flex;
         align-items: center;
-        padding: 10px 20px;
+        padding: 7px 14px;
         border-bottom: 1px solid var(--border);
-        gap: 10px;
+        gap: 6px;
       }
       .picole-flavor-row:last-child {
         border-bottom: none;
       }
       .picole-flavor-name {
         flex: 1;
-        font-size: 0.9rem;
+        font-size: 0.8rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .picole-flavor-name.disabled {
         color: #bbb;
@@ -210,16 +213,17 @@
       .qty-ctrl {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 4px;
+        flex-shrink: 0;
       }
       .qty-btn {
-        width: 30px;
-        height: 30px;
+        width: 26px;
+        height: 26px;
         border-radius: 50%;
         border: 1.5px solid var(--accent);
         background: #fff;
         color: var(--accent);
-        font-size: 1.1rem;
+        font-size: 1rem;
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -240,10 +244,10 @@
         cursor: not-allowed;
       }
       .qty-val {
-        min-width: 28px;
+        min-width: 22px;
         text-align: center;
         font-weight: 600;
-        font-size: 0.95rem;
+        font-size: 0.85rem;
         color: var(--brand);
       }
 
@@ -450,9 +454,14 @@
         line-height: 1;
       }
 
-      #cart-items {
+      .cart-body {
         flex: 1;
         overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+      #cart-items {
+        flex: 1;
         padding: 16px 20px;
       }
       .cart-empty {
@@ -696,6 +705,7 @@
         <h2>Seu Pedido</h2>
         <button id="cart-close" title="Fechar">&times;</button>
       </div>
+      <div class="cart-body">
       <div id="cart-items"></div>
       <div class="cart-total" id="cart-total-display"></div>
       <div class="cart-form">
@@ -728,6 +738,7 @@
           Enviar pedido via WhatsApp
         </button>
       </div>
+      </div><!-- fim .cart-body -->
     </div>
 
     <!-- Confirmation Modal (potes) -->
@@ -760,7 +771,7 @@
         /* ── Logo ── */
         const logoWrap = document.getElementById("logo-wrap");
         const img = document.createElement("img");
-        img.src = "assets/logo.png";
+        img.src = "assets/Logo.png";
         img.alt = "Logo Dubon";
         img.onerror = () => {
           logoWrap.innerHTML = '<div class="logo-fallback">🍦</div>';
