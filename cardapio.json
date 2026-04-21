@@ -93,6 +93,7 @@
       "nome": "Picolé Fruta",
       "emoji": "🍉",
       "tipo": "picole",
+      "pool_quantidade": true,
       "descricao_categoria": "Preço varia conforme a quantidade",
       "precos_quantidade": {
         "1":  3.00,
@@ -116,6 +117,7 @@
       "nome": "Picolé ao Leite",
       "emoji": "🍫",
       "tipo": "picole",
+      "pool_quantidade": true,
       "descricao_categoria": "Preço varia conforme a quantidade",
       "precos_quantidade": {
         "1":  3.50,

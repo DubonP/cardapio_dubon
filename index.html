@@ -945,64 +945,57 @@
           return m ? m[1] + " litros" : nome;
         }
 
-        function ehPremium(cat) {
-          return cat.nome.includes("Premium");
+        /* ── Retorna o objeto de categoria de um item do carrinho ── */
+        function catDoItem(item) {
+          return cardapio.categorias.find((c) => c.nome === item.categoria) || {};
         }
 
-        /* ── Preço efetivo de picolé (considera pool Fruta+Leite + carrinho) ── */
+        /* ── Categoria participa do pool Fruta+Leite? ── */
+        function ehPoolQtd(cat) {
+          return cat.pool_quantidade === true;
+        }
+
+        /* ── Preço efetivo de picolé (considera pool Fruta+Leite + carrinho) ──
+           Regras:
+           - Fruta e Leite: pool compartilhado. O tier de preço depende da soma
+             de TODOS os picolés Fruta+Leite (seleção atual + carrinho).
+             Cada categoria usa seu próprio preço no tier calculado.
+           - Premium, Casquinha e outros: preço fixo, sem pool, sem promoção.
+        ── */
         function precoEfetivoPicole(catIdx, cat) {
-          if (ehPremium(cat)) {
-            // Premium: seleção atual + itens Premium desta categoria já no carrinho
-            const selecao = somaQty(picoleQty[catIdx]);
-            const noCarrinho = cart
-              .filter(
-                (item) => item.tipo === "picole" && item.categoria === cat.nome,
-              )
-              .reduce((s, i) => s + i.qty, 0);
-            return picolePrice(cat.precos_quantidade, selecao + noCarrinho);
+          if (!ehPoolQtd(cat)) {
+            // Preço fixo: quantidade não altera o preço unitário
+            return picolePrice(cat.precos_quantidade, 1);
           }
-          // Pool não-Premium: seleção atual + itens não-Premium já no carrinho
+          // Pool Fruta+Leite: soma seleção atual de TODAS categorias do pool
           let totalSelecao = 0;
           cardapio.categorias.forEach((c, i) => {
-            if (c.tipo === "picole" && !ehPremium(c)) {
-              totalSelecao += somaQty(picoleQty[i]);
-            }
+            if (ehPoolQtd(c)) totalSelecao += somaQty(picoleQty[i]);
           });
+          // Soma itens do pool já no carrinho
           const totalCarrinho = cart
-            .filter(
-              (item) =>
-                item.tipo === "picole" && !item.categoria.includes("Premium"),
-            )
+            .filter((item) => item.tipo === "picole" && ehPoolQtd(catDoItem(item)))
             .reduce((s, i) => s + i.qty, 0);
-          return picolePrice(
-            cat.precos_quantidade,
-            totalSelecao + totalCarrinho,
-          );
+          return picolePrice(cat.precos_quantidade, totalSelecao + totalCarrinho);
         }
 
         /* ── Recalcula preços dos picolés já no carrinho ── */
         function recalcularCarrinhoPicole() {
+          // Calcula o total do pool Fruta+Leite no carrinho uma única vez
+          const totalPoolCarrinho = cart
+            .filter((i) => i.tipo === "picole" && ehPoolQtd(catDoItem(i)))
+            .reduce((s, i) => s + i.qty, 0);
+
           cart.forEach((item) => {
             if (item.tipo !== "picole") return;
-            const cat = cardapio.categorias.find(
-              (c) => c.nome === item.categoria,
-            );
-            if (!cat) return;
-            if (ehPremium(cat)) {
-              // Para Premium: pool = itens desta categoria no carrinho (já inclui o item atual)
-              const totalPremium = cart
-                .filter((i) => i.tipo === "picole" && i.categoria === cat.nome)
-                .reduce((s, i) => s + i.qty, 0);
-              item.preco = picolePrice(cat.precos_quantidade, totalPremium);
+            const cat = catDoItem(item);
+            if (!cat.precos_quantidade) return;
+            if (ehPoolQtd(cat)) {
+              // Pool Fruta+Leite: preço determinado pelo total do pool no carrinho
+              item.preco = picolePrice(cat.precos_quantidade, totalPoolCarrinho);
             } else {
-              // Pool não-Premium: todos os itens não-Premium no carrinho
-              const totalPool = cart
-                .filter(
-                  (i) =>
-                    i.tipo === "picole" && !i.categoria.includes("Premium"),
-                )
-                .reduce((s, i) => s + i.qty, 0);
-              item.preco = picolePrice(cat.precos_quantidade, totalPool);
+              // Preço fixo: não depende de quantidade
+              item.preco = picolePrice(cat.precos_quantidade, 1);
             }
             item.total = item.preco * item.qty;
           });
@@ -1275,16 +1268,15 @@
         }
 
         function onPicoleQtyChange(changedIdx, changedCat) {
-          if (ehPremium(changedCat)) {
-            // Só atualiza o próprio
-            updatePicoleSummary(changedIdx, changedCat);
-          } else {
-            // Atualiza todos os não-Premium (preço compartilhado)
+          if (ehPoolQtd(changedCat)) {
+            // Pool Fruta+Leite: atualiza o resumo de TODAS as categorias do pool
+            // (o tier de preço pode ter mudado para ambas)
             cardapio.categorias.forEach((cat, idx) => {
-              if (cat.tipo === "picole" && !ehPremium(cat)) {
-                updatePicoleSummary(idx, cat);
-              }
+              if (ehPoolQtd(cat)) updatePicoleSummary(idx, cat);
             });
+          } else {
+            // Preço fixo: atualiza só o próprio
+            updatePicoleSummary(changedIdx, changedCat);
           }
         }
 
