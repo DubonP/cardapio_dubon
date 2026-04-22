@@ -740,6 +740,62 @@
         margin-bottom: 4px;
       }
 
+      /* ── Payment method ── */
+      .payment-toggle {
+        display: flex;
+        gap: 6px;
+        margin-top: 6px;
+        flex-wrap: wrap;
+      }
+      .payment-btn {
+        flex: 1;
+        min-width: 80px;
+        padding: 8px 6px;
+        border-radius: 8px;
+        border: 1.5px solid var(--border);
+        background: var(--surface);
+        color: var(--muted);
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: "Poppins", sans-serif;
+        transition: all 0.15s;
+        text-align: center;
+      }
+      .payment-btn.active {
+        border-color: var(--brand);
+        background: var(--brand);
+        color: #fff;
+      }
+      .payment-btn:hover:not(.active) {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .troco-toggle {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .troco-btn {
+        flex: 1;
+        padding: 7px 6px;
+        border-radius: 8px;
+        border: 1.5px solid var(--border);
+        background: var(--surface);
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: "Poppins", sans-serif;
+        transition: all 0.15s;
+        text-align: center;
+      }
+      .troco-btn.active {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+      }
+
       /* ── Responsive ── */
       @media (max-width: 480px) {
         header h1 {
@@ -852,6 +908,24 @@
               placeholder="Ex: Próximo ao mercado"
             />
           </div>
+          <div id="forma-pagamento" style="display: block">
+            <label>Forma de pagamento</label>
+            <div class="payment-toggle">
+              <button class="payment-btn" data-method="dinheiro" type="button">💵 Dinheiro</button>
+              <button class="payment-btn" data-method="maquina" type="button">💳 Cartão/QRcode</button>
+              <button class="payment-btn" data-method="pix" type="button">📱 Chave Pix</button>
+            </div>
+            <div id="troco-wrap" style="display: none">
+              <div class="troco-toggle">
+                <button class="troco-btn active" id="btn-sem-troco" type="button">Sem troco</button>
+                <button class="troco-btn" id="btn-com-troco" type="button">Preciso de troco</button>
+              </div>
+              <div id="troco-valor-wrap" style="display: none">
+                <label for="inp-troco">Troco para quanto?</label>
+                <input type="text" id="inp-troco" placeholder="Ex: 50,00" />
+              </div>
+            </div>
+          </div>
           <button id="send-btn">
             <svg viewBox="0 0 24 24">
               <path
@@ -909,6 +983,8 @@
         let cart = [];
         let nextId = 0;
         let tipoEntrega = "entrega";
+        let formaPagamento = null;
+        let precisaTroco = false;
 
         /* ── Picolé qty state: { catIdx: { flavorName: qty } } ── */
         const picoleQty = {};
@@ -1370,6 +1446,12 @@
             document.getElementById("btn-retirada").classList.add("active");
             document.getElementById("btn-entrega").classList.remove("active");
             document.getElementById("campos-entrega").style.display = "none";
+            document.getElementById("forma-pagamento").style.display = "none";
+            formaPagamento = null;
+            precisaTroco = false;
+            document.querySelectorAll(".payment-btn").forEach((b) => b.classList.remove("active"));
+            document.getElementById("troco-wrap").style.display = "none";
+            document.getElementById("troco-valor-wrap").style.display = "none";
             updateCartUI();
           });
 
@@ -1378,7 +1460,37 @@
           document.getElementById("btn-entrega").classList.add("active");
           document.getElementById("btn-retirada").classList.remove("active");
           document.getElementById("campos-entrega").style.display = "block";
+          document.getElementById("forma-pagamento").style.display = "block";
           updateCartUI();
+        });
+
+        /* ── Payment method ── */
+        document.querySelectorAll(".payment-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            document.querySelectorAll(".payment-btn").forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+            formaPagamento = btn.dataset.method;
+            document.getElementById("troco-wrap").style.display =
+              formaPagamento === "dinheiro" ? "block" : "none";
+            if (formaPagamento !== "dinheiro") {
+              precisaTroco = false;
+              document.getElementById("troco-valor-wrap").style.display = "none";
+            }
+          });
+        });
+
+        document.getElementById("btn-sem-troco").addEventListener("click", () => {
+          precisaTroco = false;
+          document.getElementById("btn-sem-troco").classList.add("active");
+          document.getElementById("btn-com-troco").classList.remove("active");
+          document.getElementById("troco-valor-wrap").style.display = "none";
+        });
+
+        document.getElementById("btn-com-troco").addEventListener("click", () => {
+          precisaTroco = true;
+          document.getElementById("btn-com-troco").classList.add("active");
+          document.getElementById("btn-sem-troco").classList.remove("active");
+          document.getElementById("troco-valor-wrap").style.display = "block";
         });
 
         /* ── Send via WhatsApp ── */
@@ -1421,6 +1533,11 @@
             if (referencia) enderecoInfo += `📌 Referência: ${referencia}\n`;
           }
 
+          if (tipoEntrega === "entrega" && !formaPagamento) {
+            alert("Selecione a forma de pagamento.");
+            return;
+          }
+
           let msg = "Olá Dubon! Gostaria de fazer um pedido:\n\n";
           let grandTotal = 0;
 
@@ -1447,6 +1564,20 @@
             msg += `📍 Retirada na loja`;
           } else {
             msg += `📍 Entrega:\n${enderecoInfo}`;
+            if (formaPagamento === "dinheiro") {
+              const troco = document.getElementById("inp-troco").value.trim();
+              if (precisaTroco && troco) {
+                msg += `💵 Pagamento: Dinheiro (troco para R$ ${troco})`;
+              } else if (precisaTroco) {
+                msg += `💵 Pagamento: Dinheiro (precisa de troco)`;
+              } else {
+                msg += `💵 Pagamento: Dinheiro (sem troco)`;
+              }
+            } else if (formaPagamento === "maquina") {
+              msg += `💳 Pagamento: Máquina (cartão / Pix QR)`;
+            } else if (formaPagamento === "pix") {
+              msg += `📱 Pagamento: Pix pela chave`;
+            }
           }
 
           const url = `https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`;
