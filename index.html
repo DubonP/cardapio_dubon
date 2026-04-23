@@ -1539,6 +1539,7 @@
           }
 
           let msg = "Olá Dubon! Gostaria de fazer um pedido:\n\n";
+          msg += `👤 Nome: ${nome}\n\n`;
           let grandTotal = 0;
 
           cart.forEach((item) => {
@@ -1552,32 +1553,31 @@
             msg += `Sabor${item.saborLabel.includes(",") ? "es" : ""}: ${item.saborLabel}\n\n`;
           });
 
-          const totalComTaxa =
-            tipoEntrega === "entrega" ? grandTotal + taxaEntrega : grandTotal;
-          msg += `💰 *Total: ${fmt(totalComTaxa)}*`;
-          if (tipoEntrega === "entrega" && taxaEntrega > 0) {
-            msg += ` _(inclui taxa de entrega ${fmt(taxaEntrega)})_`;
-          }
-          msg += `\n\n`;
-          msg += `👤 Nome: ${nome}\n`;
           if (tipoEntrega === "retirada") {
-            msg += `📍 Retirada na loja`;
+            msg += `📍 Retirada na loja\n`;
           } else {
             msg += `📍 Entrega:\n${enderecoInfo}`;
             if (formaPagamento === "dinheiro") {
               const troco = document.getElementById("inp-troco").value.trim();
               if (precisaTroco && troco) {
-                msg += `💵 Pagamento: Dinheiro (troco para R$ ${troco})`;
+                msg += `💵 Pagamento: Dinheiro (troco para R$ ${troco})\n`;
               } else if (precisaTroco) {
-                msg += `💵 Pagamento: Dinheiro (precisa de troco)`;
+                msg += `💵 Pagamento: Dinheiro (precisa de troco)\n`;
               } else {
-                msg += `💵 Pagamento: Dinheiro (sem troco)`;
+                msg += `💵 Pagamento: Dinheiro (sem troco)\n`;
               }
             } else if (formaPagamento === "maquina") {
-              msg += `💳 Pagamento: Máquina (cartão / Pix QR)`;
+              msg += `💳 Pagamento: Máquina (cartão / Pix QR)\n`;
             } else if (formaPagamento === "pix") {
-              msg += `📱 Pagamento: Pix pela chave`;
+              msg += `📱 Pagamento: Pix pela chave\n`;
             }
+          }
+
+          const totalComTaxa =
+            tipoEntrega === "entrega" ? grandTotal + taxaEntrega : grandTotal;
+          msg += `\n💰 *Total: ${fmt(totalComTaxa)}*`;
+          if (tipoEntrega === "entrega" && taxaEntrega > 0) {
+            msg += ` _(inclui taxa de entrega ${fmt(taxaEntrega)})_`;
           }
 
           const url = `https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`;
