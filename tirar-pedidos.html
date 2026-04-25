@@ -109,6 +109,8 @@
         background: var(--surface);
         padding: 16px 20px;
         border-bottom: 1px solid var(--border);
+        cursor: pointer;
+        user-select: none;
       }
       .categoria-header h2 {
         font-family: "Poppins", sans-serif;
@@ -1073,6 +1075,10 @@
 
           const title = document.createElement("h2");
           title.textContent = cat.nome;
+          const expandArrow = document.createElement("span");
+          expandArrow.textContent = "▾";
+          expandArrow.style.cssText = "margin-left:auto;font-size:1.1rem;color:var(--muted);transition:transform 0.2s;display:inline-block;";
+          title.appendChild(expandArrow);
           hdr.appendChild(title);
 
           const descDiv = document.createElement("div");
@@ -1108,8 +1114,10 @@
               descDiv.appendChild(table);
             }
           }
-          hdr.appendChild(descDiv);
           card.appendChild(hdr);
+
+          const body = document.createElement("div");
+          body.appendChild(descDiv);
 
           if (cat.tipo === "pote") {
             const list = document.createElement("div");
@@ -1136,7 +1144,7 @@
               }
               list.appendChild(row);
             });
-            card.appendChild(list);
+            body.appendChild(list);
           } else {
             const list = document.createElement("div");
             list.className = "picole-list";
@@ -1181,22 +1189,29 @@
               row.appendChild(ctrl);
               list.appendChild(row);
             });
-            card.appendChild(list);
+            body.appendChild(list);
 
             const summary = document.createElement("div");
             summary.className = "picole-summary";
             summary.innerHTML =
               '<span>Total: <strong>0 unidades</strong></span><span class="summary-total">R$ 0,00</span>';
             picoleSummaryEls[idx] = summary;
-            card.appendChild(summary);
+            body.appendChild(summary);
 
             const addBtn = document.createElement("button");
             addBtn.className = "add-btn";
             addBtn.textContent = "Adicionar ao pedido";
             addBtn.addEventListener("click", () => addPicoleToCart(idx, cat));
-            card.appendChild(addBtn);
+            body.appendChild(addBtn);
           }
 
+          body.style.display = "none";
+          card.appendChild(body);
+          hdr.addEventListener("click", () => {
+            const isOpen = body.style.display === "none";
+            body.style.display = isOpen ? "block" : "none";
+            expandArrow.style.transform = isOpen ? "rotate(-180deg)" : "";
+          });
           menu.appendChild(card);
         });
 
@@ -1438,7 +1453,9 @@
             if (formaPagamento === "dinheiro") {
               const troco = document.getElementById("inp-troco").value.trim();
               if (precisaTroco && troco) {
-                txt += `PAGAMENTO: Dinheiro\n  Troco para: R$ ${troco}\n`;
+                const trocoNum = parseFloat(troco.replace(",", "."));
+                const trocoFmt = !isNaN(trocoNum) ? trocoNum.toFixed(2).replace(".", ",") : troco;
+                txt += `PAGAMENTO: Dinheiro\n  Troco para: R$ ${trocoFmt}\n`;
               } else if (precisaTroco) {
                 txt += `PAGAMENTO: Dinheiro (troco)\n`;
               } else {

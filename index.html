@@ -1583,7 +1583,8 @@
                   alert(`O troco não pode ser menor que o total do pedido (${fmt(grandTotal + taxaEntrega)}).`);
                   return;
                 }
-                msg += `💵 *Pagamento: Dinheiro (troco para R$ ${troco})*\n`;
+                const trocoFmt = !isNaN(trocoVal) ? trocoVal.toFixed(2).replace(".", ",") : troco;
+                msg += `💵 *Pagamento: Dinheiro (troco para R$ ${trocoFmt})*\n`;
               } else if (precisaTroco) {
                 msg += `💵 *Pagamento: Dinheiro (precisa de troco)*\n`;
               } else {
