@@ -1430,6 +1430,24 @@
           document.getElementById("cart-overlay").classList.remove("open");
         }
 
+        function limparCarrinho() {
+          cart = [];
+          formaPagamento = null;
+          precisaTroco = false;
+          ["inp-nome", "inp-rua", "inp-numero", "inp-bairro", "inp-referencia", "inp-troco"].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.value = "";
+          });
+          document.querySelectorAll(".payment-btn").forEach((b) => b.classList.remove("active"));
+          document.getElementById("btn-sem-troco").classList.add("active");
+          document.getElementById("btn-com-troco").classList.remove("active");
+          document.getElementById("troco-wrap").style.display = "none";
+          document.getElementById("troco-valor-wrap").style.display = "none";
+          recalcularCarrinhoPicole();
+          updateAllPicoleSummaries();
+          updateCartUI();
+        }
+
         document.getElementById("cart-fab").addEventListener("click", openCart);
         document
           .getElementById("cart-close")
@@ -1560,16 +1578,21 @@
             if (formaPagamento === "dinheiro") {
               const troco = document.getElementById("inp-troco").value.trim();
               if (precisaTroco && troco) {
-                msg += `💵 Pagamento: Dinheiro (troco para R$ ${troco})\n`;
+                const trocoVal = parseFloat(troco.replace(",", "."));
+                if (!isNaN(trocoVal) && trocoVal < grandTotal + taxaEntrega) {
+                  alert(`O troco não pode ser menor que o total do pedido (${fmt(grandTotal + taxaEntrega)}).`);
+                  return;
+                }
+                msg += `💵 *Pagamento: Dinheiro (troco para R$ ${troco})*\n`;
               } else if (precisaTroco) {
-                msg += `💵 Pagamento: Dinheiro (precisa de troco)\n`;
+                msg += `💵 *Pagamento: Dinheiro (precisa de troco)*\n`;
               } else {
-                msg += `💵 Pagamento: Dinheiro (sem troco)\n`;
+                msg += `💵 *Pagamento: Dinheiro (sem troco)*\n`;
               }
             } else if (formaPagamento === "maquina") {
-              msg += `💳 Pagamento: Máquina (cartão / Pix QR)\n`;
+              msg += `💳 *Pagamento: Máquina (cartão / Pix QR)*\n`;
             } else if (formaPagamento === "pix") {
-              msg += `📱 Pagamento: Pix pela chave\n`;
+              msg += `📱 *Pagamento: Pix pela chave*\n`;
             }
           }
 
@@ -1582,6 +1605,8 @@
 
           const url = `https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`;
           window.open(url, "_blank");
+          limparCarrinho();
+          closeCart();
         });
 
         updateCartUI();

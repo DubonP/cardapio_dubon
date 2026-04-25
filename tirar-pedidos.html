@@ -1295,6 +1295,24 @@
           document.getElementById("cart-panel").classList.remove("open");
           document.getElementById("cart-overlay").classList.remove("open");
         }
+
+        function limparCarrinho() {
+          cart = [];
+          formaPagamento = null;
+          precisaTroco = false;
+          ["inp-nome", "inp-rua", "inp-numero", "inp-bairro", "inp-referencia", "inp-troco"].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.value = "";
+          });
+          document.querySelectorAll(".payment-btn").forEach((b) => b.classList.remove("active"));
+          document.getElementById("btn-sem-troco").classList.add("active");
+          document.getElementById("btn-com-troco").classList.remove("active");
+          document.getElementById("troco-wrap").style.display = "none";
+          document.getElementById("troco-valor-wrap").style.display = "none";
+          recalcularCarrinhoPicole();
+          updateAllPicoleSummaries();
+          updateCartUI();
+        }
         document.getElementById("cart-fab").addEventListener("click", openCart);
         document
           .getElementById("cart-close")
@@ -1413,29 +1431,34 @@
             txt += `  ${rua}, ${numero}\n`;
             txt += `  Bairro: ${bairro}\n`;
             if (ref) txt += `  Ref: ${ref}\n`;
+          }
+
+          if (tipoEntrega === "entrega") {
+            txt += SEP + "\n";
             if (formaPagamento === "dinheiro") {
               const troco = document.getElementById("inp-troco").value.trim();
               if (precisaTroco && troco) {
-                txt += `Pagamento: Dinheiro\n  Troco para: R$ ${troco}\n`;
+                txt += `PAGAMENTO: Dinheiro\n  Troco para: R$ ${troco}\n`;
               } else if (precisaTroco) {
-                txt += `Pagamento: Dinheiro (troco)\n`;
+                txt += `PAGAMENTO: Dinheiro (troco)\n`;
               } else {
-                txt += `Pagamento: Dinheiro (sem troco)\n`;
+                txt += `PAGAMENTO: Dinheiro (sem troco)\n`;
               }
             } else if (formaPagamento === "maquina") {
-              txt += `Pagamento: Maquina (cartao/Pix QR)\n`;
+              txt += `PAGAMENTO: Maquina (cartao/Pix QR)\n`;
             } else if (formaPagamento === "pix") {
-              txt += `Pagamento: Pix pela chave\n`;
+              txt += `PAGAMENTO: Pix pela chave\n`;
             }
           }
 
+          txt += SEP + "\n";
           let totalFinal = grandTotal;
           if (tipoEntrega === "entrega" && taxaEntrega > 0) {
             txt += `Subtotal: ${fmt(grandTotal)}\n`;
             txt += `Taxa entrega: ${fmt(taxaEntrega)}\n`;
             totalFinal += taxaEntrega;
           }
-          txt += `TOTAL: ${fmt(totalFinal)}\n`;
+          txt += `** TOTAL: ${fmt(totalFinal)} **\n`;
           txt += TITLE + "\n";
 
           return txt;
@@ -1469,9 +1492,23 @@
               alert("Selecione a forma de pagamento.");
               return;
             }
+            if (formaPagamento === "dinheiro" && precisaTroco) {
+              const trocoInput = document.getElementById("inp-troco").value.trim();
+              if (trocoInput) {
+                const grandTotal = cart.reduce((sum, item) => sum + item.total, 0);
+                const totalFinal = grandTotal + taxaEntrega;
+                const trocoVal = parseFloat(trocoInput.replace(",", "."));
+                if (!isNaN(trocoVal) && trocoVal < totalFinal) {
+                  alert(`O troco não pode ser menor que o total do pedido (${fmt(totalFinal)}).`);
+                  return;
+                }
+              }
+            }
           }
           document.getElementById("print-area").textContent = gerarRecibo();
           window.print();
+          limparCarrinho();
+          closeCart();
         });
 
         /* ── Imprimir (aba Imprimir — colar do WhatsApp) ── */
