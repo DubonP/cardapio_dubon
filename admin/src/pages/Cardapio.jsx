@@ -214,58 +214,76 @@ export default function Cardapio() {
 
 // ── CatCard ──────────────────────────────────────────────────────
 function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleProd, onDeleteProd, onEditPrecos }) {
+  const [open, setOpen] = useState(false)
   const isPicole = cat.tipo === 'PICOLE'
   const simplePrice = !isPicole && cat.precosPorQuantidade?.[0]?.preco
 
   return (
     <div className={`bg-white rounded-xl shadow-sm border transition-opacity ${cat.ativo ? '' : 'opacity-60'}`}>
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b">
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${TIPO_CLS[cat.tipo]}`}>
+      {/* Header — clica para expandir */}
+      <div
+        className="flex items-center gap-2 px-4 py-3 cursor-pointer select-none"
+        onClick={() => setOpen(o => !o)}
+      >
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${TIPO_CLS[cat.tipo]}`}>
           {TIPO_LABEL[cat.tipo]}
         </span>
-        <span className="font-semibold text-gray-800 flex-1">{cat.nome}</span>
+
+        <span className="font-semibold text-gray-800 flex-1 min-w-0 truncate">{cat.nome}</span>
+
+        {!open && cat.produtos.length > 0 && (
+          <span className="text-xs text-gray-400 flex-shrink-0">{cat.produtos.length} sabores</span>
+        )}
 
         {simplePrice && (
-          <span className="text-sm text-gray-500">{fmt(simplePrice)}</span>
+          <span className="text-sm text-gray-500 flex-shrink-0">{fmt(simplePrice)}</span>
         )}
 
         {isPicole && (
           <button
-            onClick={onEditPrecos}
-            className="text-xs text-brand border border-brand/30 px-2 py-0.5 rounded hover:bg-brand/5"
+            onClick={e => { e.stopPropagation(); onEditPrecos() }}
+            className="text-xs text-brand border border-brand/30 px-2 py-0.5 rounded hover:bg-brand/5 flex-shrink-0"
           >
             Preços
           </button>
         )}
 
-        <button onClick={onEditCat} className="text-gray-400 hover:text-gray-600 p-1">✏️</button>
+        <button
+          onClick={e => { e.stopPropagation(); onEditCat() }}
+          className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0"
+        >
+          ✏️
+        </button>
 
-        <label className="flex items-center gap-1.5 cursor-pointer">
-          <span className="text-xs text-gray-400">{cat.ativo ? 'Ativo' : 'Inativo'}</span>
+        <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
           <Toggle checked={cat.ativo} onChange={onToggleCat} />
-        </label>
+        </div>
+
+        <span className="text-gray-400 text-xs w-3 text-center flex-shrink-0">
+          {open ? '▲' : '▼'}
+        </span>
       </div>
 
-      {/* Products */}
-      <div className="divide-y divide-gray-50">
-        {cat.produtos.map(prod => (
-          <div key={prod.id} className={`flex items-center gap-3 px-4 py-2.5 ${prod.disponivel ? '' : 'opacity-50'}`}>
-            <span className="flex-1 text-sm text-gray-700">{prod.nome}</span>
-            <button onClick={() => onEditProd(prod)} className="text-gray-300 hover:text-gray-500 text-sm p-1">✏️</button>
-            <button onClick={() => onDeleteProd(prod.id)} className="text-gray-300 hover:text-red-400 text-sm p-1">🗑️</button>
-            <Toggle checked={prod.disponivel} onChange={() => onToggleProd(prod)} />
+      {/* Produtos — colapsável */}
+      {open && (
+        <div className="border-t divide-y divide-gray-50">
+          {cat.produtos.map(prod => (
+            <div key={prod.id} className={`flex items-center gap-3 px-4 py-2.5 ${prod.disponivel ? '' : 'opacity-50'}`}>
+              <span className="flex-1 text-sm text-gray-700">{prod.nome}</span>
+              <button onClick={() => onEditProd(prod)} className="text-gray-300 hover:text-gray-500 p-1 flex-shrink-0">✏️</button>
+              <button onClick={() => onDeleteProd(prod.id)} className="text-gray-300 hover:text-red-400 p-1 flex-shrink-0">🗑️</button>
+              <div className="flex-shrink-0">
+                <Toggle checked={prod.disponivel} onChange={() => onToggleProd(prod)} />
+              </div>
+            </div>
+          ))}
+          <div className="px-4 py-2">
+            <button onClick={onAddProd} className="text-xs text-brand font-medium hover:underline">
+              + Adicionar sabor
+            </button>
           </div>
-        ))}
-        <div className="px-4 py-2">
-          <button
-            onClick={onAddProd}
-            className="text-xs text-brand font-medium hover:underline"
-          >
-            + Adicionar sabor
-          </button>
         </div>
-      </div>
+      )}
     </div>
   )
 }
