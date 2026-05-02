@@ -870,10 +870,6 @@
       <p>Sorvete artesanal, desde 1991</p>
     </header>
 
-    <div class="notice-bar">
-      ⚠️ Após montar seu pedido, <strong>confirme na tela</strong> para
-      registrar seu pedido.
-    </div>
     <main id="menu"></main>
 
     <footer>
@@ -1035,8 +1031,13 @@
               pool_quantidade: !!cat.poolId,
               descricao_categoria: '',
               unidade_label: undefined,
+              produtos: [...(cat.produtos || [])].sort((a, b) =>
+                a.nome.localeCompare(b.nome, 'pt-BR')
+              ),
             };
           });
+
+          categorias.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
           return {
             whatsapp: apiData.configuracoes?.whatsapp_loja || '',
