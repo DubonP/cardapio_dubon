@@ -1006,6 +1006,22 @@
       (async () => {
         const API_URL = 'https://backdubon-production.up.railway.app';
 
+        /* ── Calcula se a loja está aberta usando horário do BROWSER (evita fuso do servidor) ── */
+        function calcularAberto(horarios) {
+          const agora = new Date();
+          const dia = String(agora.getDay()); // "0"=Dom … "6"=Sáb
+          const hh = String(agora.getHours()).padStart(2, '0');
+          const mm = String(agora.getMinutes()).padStart(2, '0');
+          const horaAtual = `${hh}:${mm}`;
+
+          const cfg = (horarios || {})[dia];
+          const abre  = cfg?.abre  || '12:00';
+          const fecha = cfg?.fecha || '22:00';
+          const ativo = cfg?.ativo !== false;
+
+          return { aberto: ativo && horaAtual >= abre && horaAtual < fecha, abre, fecha };
+        }
+
         /* ── Normaliza resposta da API para o formato esperado pelo front ── */
         function normalizarCardapio(apiData) {
           const categorias = (apiData.categorias || []).map((cat) => {
@@ -1039,12 +1055,16 @@
 
           categorias.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
+          let horarios = {};
+          try { if (apiData.configuracoes?.horarios_funcionamento) horarios = JSON.parse(apiData.configuracoes.horarios_funcionamento); } catch {}
+          const { aberto, abre, fecha } = calcularAberto(horarios);
+
           return {
             whatsapp: apiData.configuracoes?.whatsapp_loja || '',
             taxa_entrega: parseFloat(apiData.configuracoes?.taxa_entrega || '0'),
-            aberto: apiData.aberto !== false,
-            abre: apiData.abre || '12:00',
-            fecha: apiData.fecha || '22:00',
+            aberto,
+            abre,
+            fecha,
             categorias,
           };
         }
