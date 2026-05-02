@@ -1684,10 +1684,22 @@
           let trocoPara = null;
           if (formaPagamento === 'dinheiro' && precisaTroco) {
             const trocoRaw = document.getElementById('inp-troco').value.trim();
-            if (trocoRaw) {
-              const v = parseFloat(trocoRaw.replace(',', '.'));
-              if (!isNaN(v)) trocoPara = v;
+            if (!trocoRaw) {
+              alert('Informe o valor para o troco.');
+              return;
             }
+            const v = parseFloat(trocoRaw.replace(',', '.'));
+            if (isNaN(v) || v <= 0) {
+              alert('Valor do troco inválido.');
+              return;
+            }
+            const totalPedido = cart.reduce((s, i) => s + i.total, 0) +
+              (tipoEntrega === 'entrega' ? taxaEntrega : 0);
+            if (v < totalPedido) {
+              alert(`O troco precisa ser maior ou igual ao total do pedido (${fmt(totalPedido)}).`);
+              return;
+            }
+            trocoPara = v;
           }
 
           // Monta itens para API: picolés expandidos por sabor
