@@ -247,9 +247,9 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onMsg, onPrint }) {
   const isEntrega = p.tipoEntrega === 'ENTREGA'
 
   const cardBg = p.finalizado
-    ? 'bg-red-50 border-red-200'
+    ? 'bg-red-200 border-red-400'
     : p.saiuEntrega
-      ? 'bg-green-50 border-green-200'
+      ? 'bg-green-200 border-green-400'
       : 'bg-white border-gray-200'
 
   return (

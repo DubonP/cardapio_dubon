@@ -806,6 +806,8 @@
           </div>
           <label for="inp-nome">Nome do cliente *</label>
           <input type="text" id="inp-nome" placeholder="Ex: João" />
+          <label for="inp-contato">WhatsApp do cliente (opcional)</label>
+          <input type="tel" id="inp-contato" inputmode="numeric" placeholder="Ex: 44999999999" />
           <div id="campos-entrega" style="display: block">
             <label for="inp-rua">Rua *</label>
             <input type="text" id="inp-rua" placeholder="Ex: Rua das Flores" />
@@ -852,7 +854,7 @@
               </div>
             </div>
           </div>
-          <button id="print-btn">🖨️ Imprimir Pedido</button>
+          <button id="print-btn">✅ Enviar e Imprimir</button>
         </div>
       </div>
     </div>
@@ -872,16 +874,36 @@
     <div id="print-area"></div>
 
     <script>
+      const API_URL = 'https://backdubon-production.up.railway.app';
+
       (async () => {
-        /* ── Cardápio ── */
+        /* ── Cardápio via API ── */
         let cardapio;
         try {
-          const res = await fetch("cardapio.json");
-          cardapio = await res.json();
+          const res = await fetch(API_URL + '/api/cardapio');
+          if (!res.ok) throw new Error();
+          const raw = await res.json();
+          cardapio = normalizarCardapio(raw);
         } catch (e) {
           document.getElementById("menu").innerHTML =
             '<p style="text-align:center;color:#e74c3c;padding:32px">Erro ao carregar o cardápio.</p>';
           return;
+        }
+
+        function normalizarCardapio(apiData) {
+          const categorias = (apiData.categorias || []).map(cat => ({
+            ...cat,
+            tipo: cat.tipo.toLowerCase() === 'picole' ? 'picole' : 'pote',
+            preco_unico: cat.precosPorQuantidade?.[0]
+              ? parseFloat(cat.precosPorQuantidade[0].preco) : 0,
+            precos_quantidade: Object.fromEntries(
+              (cat.precosPorQuantidade || []).map(p => [String(p.quantidadeMinima), parseFloat(p.preco)])
+            ),
+            pool_quantidade: !!cat.poolId,
+            descricao_categoria: '',
+            produtos: [...(cat.produtos || [])].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+          })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+          return { taxa_entrega: parseFloat(apiData.configuracoes?.taxa_entrega || '0'), categorias };
         }
 
         const taxaEntrega = cardapio.taxa_entrega || 0;
@@ -911,13 +933,16 @@
         let formaPagamento = null;
         let precisaTroco = false;
 
-        /* ── Picolé qty state ── */
+        /* ── Picolé qty state + mapa de IDs ── */
         const picoleQty = {};
+        const prodIdMap = {}; // catIdx -> { prodNome -> prodId }
         cardapio.categorias.forEach((cat, idx) => {
           if (cat.tipo === "picole") {
             picoleQty[idx] = {};
+            prodIdMap[idx] = {};
             cat.produtos.forEach((p) => {
               picoleQty[idx][p.nome] = 0;
+              prodIdMap[idx][p.nome] = p.id;
             });
           }
         });
@@ -1015,13 +1040,14 @@
           });
 
         /* ── Add to cart ── */
-        function addPoteToCart(cat, saborNome) {
+        function addPoteToCart(cat, prod) {
           cart.push({
             id: nextId++,
+            produtoId: prod.id,
             categoria: cat.nome,
             emoji: cat.emoji,
             tipo: "pote",
-            saborLabel: saborNome,
+            saborLabel: prod.nome,
             qty: 1,
             preco: cat.preco_unico,
             total: cat.preco_unico,
@@ -1036,12 +1062,15 @@
             alert("Selecione ao menos um picolé antes de adicionar.");
             return;
           }
-          const saboresList = Object.entries(qtyMap)
+          const flavors = Object.entries(qtyMap)
             .filter(([, q]) => q > 0)
-            .map(([nome, q]) => (q > 1 ? `${nome} (×${q})` : nome))
+            .map(([nome, quantidade]) => ({ produtoId: prodIdMap[catIdx][nome], nome, quantidade }));
+          const saboresList = flavors
+            .map(f => f.quantidade > 1 ? `${f.nome} (×${f.quantidade})` : f.nome)
             .join(", ");
           cart.push({
             id: nextId++,
+            flavors,
             categoria: cat.nome,
             emoji: cat.emoji,
             tipo: "picole",
@@ -1138,7 +1167,7 @@
                 row.addEventListener("click", () => {
                   abrirModal(
                     `Adicionar <strong>${prod.nome}</strong><br>de ${tamanhoFromNome(cat.nome)} ao pedido?`,
-                    () => addPoteToCart(cat, prod.nome),
+                    () => addPoteToCart(cat, prod),
                   );
                 });
               }
@@ -1481,51 +1510,87 @@
           return txt;
         }
 
-        /* ── Imprimir pedido (aba Tirar Pedido) ── */
-        document.getElementById("print-btn").addEventListener("click", () => {
-          if (cart.length === 0) {
-            alert("Adicione itens ao pedido antes de imprimir.");
-            return;
-          }
+        /* ── Enviar pedido à API e imprimir ── */
+        document.getElementById("print-btn").addEventListener("click", async () => {
+          if (cart.length === 0) { alert("Adicione itens ao pedido antes de enviar."); return; }
           const nome = document.getElementById("inp-nome").value.trim();
-          if (!nome) {
-            alert("Informe o nome do cliente.");
-            return;
-          }
+          if (!nome) { alert("Informe o nome do cliente."); return; }
+
+          const rua      = document.getElementById("inp-rua").value.trim();
+          const numero   = document.getElementById("inp-numero").value.trim();
+          const bairro   = document.getElementById("inp-bairro").value.trim();
+          const ref      = document.getElementById("inp-referencia").value.trim();
+          const contatoRaw = document.getElementById("inp-contato").value.trim().replace(/\D/g, "");
+
           if (tipoEntrega === "entrega") {
-            if (!document.getElementById("inp-rua").value.trim()) {
-              alert("Informe a rua.");
-              return;
-            }
-            if (!document.getElementById("inp-numero").value.trim()) {
-              alert("Informe o número.");
-              return;
-            }
-            if (!document.getElementById("inp-bairro").value.trim()) {
-              alert("Informe o bairro.");
-              return;
-            }
-            if (!formaPagamento) {
-              alert("Selecione a forma de pagamento.");
-              return;
-            }
+            if (!rua)    { alert("Informe a rua."); return; }
+            if (!numero) { alert("Informe o número."); return; }
+            if (!bairro) { alert("Informe o bairro."); return; }
+            if (!formaPagamento) { alert("Selecione a forma de pagamento."); return; }
             if (formaPagamento === "dinheiro" && precisaTroco) {
               const trocoInput = document.getElementById("inp-troco").value.trim();
-              if (trocoInput) {
-                const grandTotal = cart.reduce((sum, item) => sum + item.total, 0);
-                const totalFinal = grandTotal + taxaEntrega;
-                const trocoVal = parseFloat(trocoInput.replace(",", "."));
-                if (!isNaN(trocoVal) && trocoVal < totalFinal) {
-                  alert(`O troco não pode ser menor que o total do pedido (${fmt(totalFinal)}).`);
-                  return;
-                }
+              if (!trocoInput) { alert("Informe o valor para o troco."); return; }
+              const grandTotal = cart.reduce((s, i) => s + i.total, 0);
+              const trocoVal = parseFloat(trocoInput.replace(",", "."));
+              if (isNaN(trocoVal) || trocoVal < grandTotal + taxaEntrega) {
+                alert(`Troco deve ser maior ou igual ao total (${fmt(grandTotal + taxaEntrega)}).`);
+                return;
               }
             }
           }
-          document.getElementById("print-area").textContent = gerarRecibo();
-          window.print();
-          limparCarrinho();
-          closeCart();
+
+          let trocoPara = null;
+          if (formaPagamento === "dinheiro" && precisaTroco) {
+            const v = parseFloat(document.getElementById("inp-troco").value.trim().replace(",", "."));
+            if (!isNaN(v)) trocoPara = v;
+          }
+
+          const itens = [];
+          cart.forEach(item => {
+            if (item.flavors) {
+              item.flavors.forEach(f => itens.push({ produtoId: f.produtoId, quantidade: f.quantidade }));
+            } else {
+              itens.push({ produtoId: item.produtoId, quantidade: item.qty });
+            }
+          });
+
+          const payload = {
+            canal: 'ATENDENTE',
+            tipoEntrega: tipoEntrega === 'entrega' ? 'ENTREGA' : 'RETIRADA',
+            clienteNome: nome || null,
+            whatsappCliente: contatoRaw ? '55' + contatoRaw : null,
+            rua: rua || null,
+            numero: numero || null,
+            bairro: bairro || null,
+            referencia: ref || null,
+            formaPagamento: (formaPagamento || 'dinheiro').toUpperCase(),
+            trocoPara,
+            itens,
+          };
+
+          const btn = document.getElementById("print-btn");
+          btn.disabled = true;
+          btn.textContent = "Enviando…";
+
+          try {
+            const res = await fetch(API_URL + '/api/pedidos', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok) { alert(data.error || 'Erro ao enviar pedido.'); return; }
+
+            document.getElementById("print-area").textContent = gerarRecibo();
+            window.print();
+            limparCarrinho();
+            closeCart();
+          } catch {
+            alert('Erro de conexão. Verifique a internet.');
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "✅ Enviar e Imprimir";
+          }
         });
 
         /* ── Imprimir (aba Imprimir — colar do WhatsApp) ── */
