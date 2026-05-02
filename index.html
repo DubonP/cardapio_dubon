@@ -1022,9 +1022,10 @@
               precos_quantidade[String(p.quantidadeMinima)] = parseFloat(p.preco);
             });
 
-            // preço fixo: pega do primeiro produto disponível
-            const primeiroProduto = (cat.produtos || []).find((p) => p.preco != null);
-            const preco_unico = primeiroProduto ? parseFloat(primeiroProduto.preco) : 0;
+            // preço fixo: primeira faixa de preço da categoria (POTE/BEBIDA têm só uma)
+            const preco_unico = cat.precosPorQuantidade?.[0]
+              ? parseFloat(cat.precosPorQuantidade[0].preco)
+              : 0;
 
             return {
               ...cat,
