@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .input {
+    @apply w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent;
+  }
+}
+
+@media print {
+  body > #root { display: none !important; }
+  #print-receipt-content { display: block !important; }
+  @page { size: 58mm auto; margin: 0; }
+}
