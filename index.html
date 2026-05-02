@@ -1042,6 +1042,9 @@
           return {
             whatsapp: apiData.configuracoes?.whatsapp_loja || '',
             taxa_entrega: parseFloat(apiData.configuracoes?.taxa_entrega || '0'),
+            aberto: apiData.aberto !== false,
+            abre: apiData.abre || '12:00',
+            fecha: apiData.fecha || '22:00',
             categorias,
           };
         }
@@ -1060,6 +1063,23 @@
 
         const whatsapp = cardapio.whatsapp || '';
         const taxaEntrega = cardapio.taxa_entrega || 0;
+        const lojaAberta = cardapio.aberto;
+
+        /* ── Banner de loja fechada ── */
+        if (!lojaAberta) {
+          const sendBtn = document.getElementById('send-btn');
+          sendBtn.disabled = true;
+          sendBtn.textContent = '🔒 Loja fechada';
+
+          const banner = document.createElement('div');
+          banner.id = 'banner-fechado';
+          banner.style.cssText =
+            'background:#fff3cd;border:1px solid #ffc107;color:#856404;border-radius:10px;' +
+            'padding:10px 14px;font-size:0.85rem;text-align:center;margin-bottom:10px;';
+          banner.innerHTML =
+            `⏰ Estamos fechados agora. <strong>Abrimos às ${cardapio.abre}</strong> e fechamos às <strong>${cardapio.fecha}</strong>.`;
+          sendBtn.parentNode.insertBefore(banner, sendBtn);
+        }
 
         /* ── Logo ── */
         const logoWrap = document.getElementById('logo-wrap');
