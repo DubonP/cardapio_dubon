@@ -246,8 +246,14 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onMsg, onPrint }) {
   const statusInfo = STATUS[p.status] || STATUS.RECEBIDO
   const isEntrega = p.tipoEntrega === 'ENTREGA'
 
+  const cardBg = p.finalizado
+    ? 'bg-red-50 border-red-200'
+    : p.saiuEntrega
+      ? 'bg-green-50 border-green-200'
+      : 'bg-white border-gray-200'
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className={`${cardBg} rounded-xl border shadow-sm overflow-hidden transition-colors`}>
       {/* Header */}
       <div className="flex items-start justify-between px-4 py-3 border-b border-gray-100">
         <div className="flex items-center gap-2 flex-wrap">
