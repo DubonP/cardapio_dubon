@@ -15,7 +15,7 @@ function horariosFromRaw(raw) {
 }
 
 export default function Configuracoes() {
-  const [form, setForm] = useState({ taxa_entrega: '', whatsapp_loja: '' })
+  const [form, setForm] = useState({ taxa_entrega: '', whatsapp_loja: '', pix_chave: '', pix_nome: '', pix_tipo: 'Celular' })
   const [horarios, setHorarios] = useState(() => horariosFromRaw(null))
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -30,6 +30,9 @@ export default function Configuracoes() {
       setForm({
         taxa_entrega: data.taxa_entrega ?? '',
         whatsapp_loja: data.whatsapp_loja ?? '',
+        pix_chave: data.pix_chave ?? '',
+        pix_nome: data.pix_nome ?? '',
+        pix_tipo: data.pix_tipo ?? 'Celular',
       })
       setHorarios(horariosFromRaw(data.horarios_funcionamento))
     } catch {
@@ -54,6 +57,9 @@ export default function Configuracoes() {
         api.patch('/api/admin/configuracoes/taxa_entrega',           { valor: String(form.taxa_entrega) }),
         api.patch('/api/admin/configuracoes/whatsapp_loja',          { valor: String(form.whatsapp_loja) }),
         api.patch('/api/admin/configuracoes/horarios_funcionamento', { valor: JSON.stringify(horariosObj) }),
+        api.patch('/api/admin/configuracoes/pix_chave',              { valor: String(form.pix_chave) }),
+        api.patch('/api/admin/configuracoes/pix_nome',               { valor: String(form.pix_nome) }),
+        api.patch('/api/admin/configuracoes/pix_tipo',               { valor: String(form.pix_tipo) }),
       ])
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
@@ -107,6 +113,49 @@ export default function Configuracoes() {
             />
             <p className="text-xs text-gray-400 mt-1">Sem espaços ou traços. Com DDD, sem +55.</p>
           </Field>
+        </Card>
+
+        {/* PIX */}
+        <Card title="PIX" icon="📱">
+          <div className="space-y-4">
+            <Field label="Nome do titular">
+              <input
+                className="input"
+                type="text"
+                value={form.pix_nome}
+                onChange={e => setField('pix_nome', e.target.value)}
+                placeholder="Ex: Sorveteira Dubon Dubelato"
+              />
+            </Field>
+            <Field label="Tipo da chave">
+              <select
+                className="input"
+                value={form.pix_tipo}
+                onChange={e => setField('pix_tipo', e.target.value)}
+              >
+                <option>Celular</option>
+                <option>CPF</option>
+                <option>CNPJ</option>
+                <option>E-mail</option>
+                <option>Aleatória</option>
+              </select>
+            </Field>
+            <Field label="Chave PIX">
+              <input
+                className="input"
+                type="text"
+                value={form.pix_chave}
+                onChange={e => setField('pix_chave', e.target.value)}
+                placeholder="Ex: 17991314906"
+              />
+            </Field>
+            {form.pix_chave && (
+              <div className="bg-gray-50 border rounded-lg p-3 text-sm text-gray-600 whitespace-pre-line">
+                <p className="text-xs text-gray-400 mb-1">Pré-visualização da mensagem:</p>
+                {`Pix\n${form.pix_nome || '—'}\n${form.pix_tipo}\n${form.pix_chave}\nEnviar comprovante por favor`}
+              </div>
+            )}
+          </div>
         </Card>
 
         {/* Horários */}

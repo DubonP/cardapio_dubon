@@ -1063,6 +1063,8 @@
             whatsapp: apiData.configuracoes?.whatsapp_loja || '',
             taxa_entrega: parseFloat(apiData.configuracoes?.taxa_entrega || '0'),
             pix_chave: apiData.configuracoes?.pix_chave || '',
+            pix_nome: apiData.configuracoes?.pix_nome || '',
+            pix_tipo: apiData.configuracoes?.pix_tipo || '',
             aberto,
             abre,
             fecha,
@@ -1085,6 +1087,8 @@
         const whatsapp = cardapio.whatsapp || '';
         const taxaEntrega = cardapio.taxa_entrega || 0;
         const pixChave = cardapio.pix_chave || '';
+        const pixNome  = cardapio.pix_nome  || '';
+        const pixTipo  = cardapio.pix_tipo  || '';
         const lojaAberta = cardapio.aberto;
 
         /* ── Banner de loja fechada ── */
@@ -1670,7 +1674,10 @@
             msg += ` _(inclui taxa de entrega ${fmt(taxaEntrega)})_`;
           }
           if (formaPagamento === 'pix' && pixChave) {
-            msg += `\n\n——————————\n📱 *Pagamento: PIX*\n🔑 *Chave: ${pixChave}*`;
+            msg += `\n\n——————————\nPix`;
+            if (pixNome)  msg += `\n${pixNome}`;
+            if (pixTipo)  msg += `\n${pixTipo}`;
+            msg += `\n${pixChave}\nEnviar comprovante por favor`;
           }
           return msg;
         }
