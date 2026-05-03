@@ -1062,6 +1062,7 @@
           return {
             whatsapp: apiData.configuracoes?.whatsapp_loja || '',
             taxa_entrega: parseFloat(apiData.configuracoes?.taxa_entrega || '0'),
+            pix_chave: apiData.configuracoes?.pix_chave || '',
             aberto,
             abre,
             fecha,
@@ -1083,6 +1084,7 @@
 
         const whatsapp = cardapio.whatsapp || '';
         const taxaEntrega = cardapio.taxa_entrega || 0;
+        const pixChave = cardapio.pix_chave || '';
         const lojaAberta = cardapio.aberto;
 
         /* ── Banner de loja fechada ── */
@@ -1621,7 +1623,7 @@
         /* ── Gera mensagem WhatsApp (opcional, após confirmação da API) ── */
         function buildWhatsAppMsg(numeroPedido, nome) {
           let grandTotal = 0;
-          let msg = `Olá Dubon! Pedido #${numeroPedido}:\n\n`;
+          let msg = `Olá Dubon! Meu pedido:\n\n`;
           msg += `👤 Nome: ${nome}\n\n`;
 
           cart.forEach((item) => {
@@ -1666,6 +1668,9 @@
           msg += `\n💰 *Total: ${fmt(totalComTaxa)}*`;
           if (tipoEntrega === 'entrega' && taxaEntrega > 0) {
             msg += ` _(inclui taxa de entrega ${fmt(taxaEntrega)})_`;
+          }
+          if (formaPagamento === 'pix' && pixChave) {
+            msg += `\n\n——————————\n📱 *Pagamento: PIX*\n🔑 *Chave: ${pixChave}*`;
           }
           return msg;
         }
