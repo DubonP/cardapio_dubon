@@ -68,6 +68,7 @@ ${enderecoHTML}
 <div class="div"></div>
 <div>Pagamento: ${pagLabel[pedido.formaPagamento] || pedido.formaPagamento}</div>
 ${pedido.trocoPara ? `<div>Troco para: ${fmt(pedido.trocoPara)}</div>` : ''}
+${pedido.pago ? `<div class="div"></div><div class="center bold" style="font-size:13px">✔ PAGO</div>` : ''}
 </body></html>`
 }
 
@@ -424,6 +425,7 @@ function gerarReciboTexto(p) {
   const pagLabel = { DINHEIRO: 'Dinheiro', MAQUINA: 'Cartão/QR', PIX: 'Pix' }
   lines.push(`Pagamento: ${pagLabel[p.formaPagamento] || p.formaPagamento}`)
   if (p.trocoPara) lines.push(`Troco para: ${fmt(p.trocoPara)}`)
+  if (p.pago) { lines.push(line); lines.push(center('✔ PAGO')) }
   lines.push(line)
 
   return lines.join('\n')
