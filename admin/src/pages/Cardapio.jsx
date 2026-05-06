@@ -83,7 +83,7 @@ export default function Cardapio() {
     setSaving(true)
     try {
       if (catModal.mode === 'add') {
-        const catPayload = { nome: formData.nome, tipo: formData.tipo }
+        const catPayload = { nome: formData.nome, tipo: formData.tipo, ordem: parseInt(formData.ordem) || 0 }
         if (formData.tipo === 'KILO' && formData.precoKilo) {
           catPayload.precoKilo = parseFloat(formData.precoKilo)
         }
@@ -98,7 +98,7 @@ export default function Cardapio() {
         setCats(cs => [...cs, newCat])
       } else {
         const tipo = catModal.data.tipo
-        const updatePayload = { nome: formData.nome }
+        const updatePayload = { nome: formData.nome, ordem: parseInt(formData.ordem) || 0 }
         if (tipo === 'KILO' && formData.precoKilo) {
           updatePayload.precoKilo = parseFloat(formData.precoKilo)
         }
@@ -109,17 +109,19 @@ export default function Cardapio() {
           ])
           setCats(cs => cs.map(c =>
             c.id === catModal.data.id
-              ? { ...c, nome: formData.nome, precosPorQuantidade: [{ quantidadeMinima: 1, preco: parseFloat(formData.preco) }] }
+              ? { ...c, nome: formData.nome, ordem: parseInt(formData.ordem) || 0, precosPorQuantidade: [{ quantidadeMinima: 1, preco: parseFloat(formData.preco) }] }
               : c
           ))
         } else if (tipo === 'KILO') {
           setCats(cs => cs.map(c =>
             c.id === catModal.data.id
-              ? { ...c, nome: formData.nome, precoKilo: parseFloat(formData.precoKilo) || c.precoKilo }
+              ? { ...c, nome: formData.nome, ordem: parseInt(formData.ordem) || 0, precoKilo: parseFloat(formData.precoKilo) || c.precoKilo }
               : c
           ))
         } else {
-          setCats(cs => cs.map(c => c.id === catModal.data.id ? { ...c, nome: formData.nome } : c))
+          setCats(cs => cs.map(c =>
+            c.id === catModal.data.id ? { ...c, nome: formData.nome, ordem: parseInt(formData.ordem) || 0 } : c
+          ))
         }
       }
       setCatModal(null)
@@ -318,9 +320,9 @@ function Toggle({ checked, onChange }) {
   return (
     <button
       onClick={onChange}
-      className={`relative w-9 h-5 rounded-full transition-colors ${checked ? 'bg-brand' : 'bg-gray-200'}`}
+      className={`relative w-9 h-5 rounded-full transition-colors overflow-hidden ${checked ? 'bg-brand' : 'bg-gray-200'}`}
     >
-      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${checked ? 'translate-x-4' : 'translate-x-0.5'}`} />
+      <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${checked ? 'translate-x-4' : 'translate-x-0'}`} />
     </button>
   )
 }
@@ -332,6 +334,7 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
     tipo: initial.tipo || 'POTE',
     preco: initial.precosPorQuantidade?.[0]?.preco ?? '',
     precoKilo: initial.precoKilo ?? '',
+    ordem: initial.ordem ?? 0,
   })
 
   const isEdit = mode === 'edit'
@@ -410,6 +413,17 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
         {!isEdit && tipo === 'PICOLE' && (
           <p className="text-xs text-gray-400">Os preços por quantidade serão configurados após criar a categoria.</p>
         )}
+
+        <Field label="Ordem no cardápio (1 = primeiro)">
+          <input
+            className="input"
+            type="number"
+            min="0"
+            value={form.ordem}
+            onChange={e => set('ordem', parseInt(e.target.value) || 0)}
+            placeholder="0"
+          />
+        </Field>
       </div>
     </Modal>
   )
