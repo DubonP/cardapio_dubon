@@ -40,7 +40,7 @@ export default function Cardapio() {
     try {
       setLoading(true)
       const { data } = await api.get('/api/admin/categorias')
-      setCats(data.map(cat => ({ ...cat, produtos: [...cat.produtos].sort(sortProdutos) })))
+      setCats(data.map(cat => ({ ...cat, produtos: [...cat.produtos].sort(sortProdutos) })).sort(sortProdutos))
     } catch {
       setErr('Erro ao carregar cardápio')
     } finally {
@@ -103,7 +103,7 @@ export default function Cardapio() {
           ])
           newCat.precosPorQuantidade = [{ quantidadeMinima: 1, preco: parseFloat(formData.preco) }]
         }
-        setCats(cs => [...cs, newCat])
+        setCats(cs => [...cs, newCat].sort(sortProdutos))
       } else {
         const tipo = catModal.data.tipo
         const updatePayload = { nome: formData.nome, ordem: parseInt(formData.ordem) || 0 }
@@ -119,17 +119,17 @@ export default function Cardapio() {
             c.id === catModal.data.id
               ? { ...c, nome: formData.nome, ordem: parseInt(formData.ordem) || 0, precosPorQuantidade: [{ quantidadeMinima: 1, preco: parseFloat(formData.preco) }] }
               : c
-          ))
+          ).sort(sortProdutos))
         } else if (tipo === 'KILO') {
           setCats(cs => cs.map(c =>
             c.id === catModal.data.id
               ? { ...c, nome: formData.nome, ordem: parseInt(formData.ordem) || 0, precoKilo: parseFloat(formData.precoKilo) || c.precoKilo }
               : c
-          ))
+          ).sort(sortProdutos))
         } else {
           setCats(cs => cs.map(c =>
             c.id === catModal.data.id ? { ...c, nome: formData.nome, ordem: parseInt(formData.ordem) || 0 } : c
-          ))
+          ).sort(sortProdutos))
         }
       }
       setCatModal(null)
@@ -256,6 +256,9 @@ function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleP
         className="flex items-center gap-2 px-4 py-3 cursor-pointer select-none"
         onClick={() => setOpen(o => !o)}
       >
+        <span className="text-xs font-mono text-gray-400 w-5 text-right flex-shrink-0 select-none">
+          {cat.ordem > 0 ? cat.ordem : '·'}
+        </span>
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${TIPO_CLS[cat.tipo]}`}>
           {TIPO_LABEL[cat.tipo]}
         </span>
