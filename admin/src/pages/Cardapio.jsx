@@ -15,6 +15,14 @@ const TIPO_CLS = {
 const INITIAL_CAT = { nome: '', tipo: 'POTE', preco: '', precoKilo: '' }
 const INITIAL_PROD = { nome: '', ordem: 0 }
 
+function sortProdutos(a, b) {
+  const oa = a.ordem ?? 0, ob = b.ordem ?? 0
+  if (oa > 0 && ob > 0) return oa - ob
+  if (oa > 0) return -1
+  if (ob > 0) return 1
+  return a.nome.localeCompare(b.nome, 'pt-BR')
+}
+
 export default function Cardapio() {
   const [cats, setCats] = useState([])
   const [loading, setLoading] = useState(true)
@@ -32,7 +40,7 @@ export default function Cardapio() {
     try {
       setLoading(true)
       const { data } = await api.get('/api/admin/categorias')
-      setCats(data)
+      setCats(data.map(cat => ({ ...cat, produtos: [...cat.produtos].sort(sortProdutos) })))
     } catch {
       setErr('Erro ao carregar cardápio')
     } finally {
@@ -145,14 +153,14 @@ export default function Cardapio() {
         })
         setCats(cs => cs.map(c =>
           c.id === prodModal.catId
-            ? { ...c, produtos: [...c.produtos, { ...data, disponivel: true }].sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome)) }
+            ? { ...c, produtos: [...c.produtos, { ...data, disponivel: true }].sort(sortProdutos) }
             : c
         ))
       } else {
         await api.patch(`/api/admin/produtos/${prodModal.data.id}`, { nome: formData.nome, ordem })
         setCats(cs => cs.map(c =>
           c.id === prodModal.catId
-            ? { ...c, produtos: c.produtos.map(p => p.id === prodModal.data.id ? { ...p, nome: formData.nome, ordem } : p).sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome)) }
+            ? { ...c, produtos: c.produtos.map(p => p.id === prodModal.data.id ? { ...p, nome: formData.nome, ordem } : p).sort(sortProdutos) }
             : c
         ))
       }
@@ -296,6 +304,9 @@ function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleP
         <div className="border-t divide-y divide-gray-50">
           {cat.produtos.map(prod => (
             <div key={prod.id} className={`flex items-center gap-3 px-4 py-2.5 ${prod.disponivel ? '' : 'opacity-50'}`}>
+              <span className="text-xs font-mono text-gray-400 w-5 text-right flex-shrink-0 select-none">
+                {prod.ordem > 0 ? prod.ordem : '·'}
+              </span>
               <span className="flex-1 text-sm text-gray-700">{prod.nome}</span>
               <button onClick={() => onEditProd(prod)} className="text-gray-300 hover:text-gray-500 p-1 flex-shrink-0">✏️</button>
               <button onClick={() => onDeleteProd(prod.id)} className="text-gray-300 hover:text-red-400 p-1 flex-shrink-0">🗑️</button>

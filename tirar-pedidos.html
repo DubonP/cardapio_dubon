@@ -874,6 +874,14 @@
           return;
         }
 
+        function sortByOrdem(a, b) {
+          const oa = a.ordem ?? 0, ob = b.ordem ?? 0;
+          if (oa > 0 && ob > 0) return oa - ob;
+          if (oa > 0) return -1;
+          if (ob > 0) return 1;
+          return a.nome.localeCompare(b.nome, 'pt-BR');
+        }
+
         function normalizarCardapio(apiData) {
           const categorias = (apiData.categorias || []).map(cat => ({
             ...cat,
@@ -886,12 +894,8 @@
             precoKilo: cat.precoKilo ? parseFloat(cat.precoKilo) : 0,
             pool_quantidade: !!cat.poolId,
             descricao_categoria: '',
-            produtos: [...(cat.produtos || [])].sort((a, b) =>
-              (a.ordem ?? 0) !== (b.ordem ?? 0) ? (a.ordem ?? 0) - (b.ordem ?? 0) : a.nome.localeCompare(b.nome, 'pt-BR')
-            ),
-          })).sort((a, b) =>
-            (a.ordem ?? 0) !== (b.ordem ?? 0) ? (a.ordem ?? 0) - (b.ordem ?? 0) : a.nome.localeCompare(b.nome, 'pt-BR')
-          );
+            produtos: [...(cat.produtos || [])].sort(sortByOrdem),
+          })).sort(sortByOrdem);
           return { taxa_entrega: parseFloat(apiData.configuracoes?.taxa_entrega || '0'), categorias };
         }
 
