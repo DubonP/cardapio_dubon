@@ -1022,6 +1022,14 @@
           return { aberto: ativo && horaAtual >= abre && horaAtual < fecha, abre, fecha };
         }
 
+        function sortByOrdem(a, b) {
+          const oa = a.ordem ?? 0, ob = b.ordem ?? 0;
+          if (oa > 0 && ob > 0) return oa - ob;
+          if (oa > 0) return -1;
+          if (ob > 0) return 1;
+          return a.nome.localeCompare(b.nome, 'pt-BR');
+        }
+
         /* ── Normaliza resposta da API para o formato esperado pelo front ── */
         function normalizarCardapio(apiData) {
           const categorias = (apiData.categorias || []).map((cat) => {
@@ -1047,13 +1055,11 @@
               pool_quantidade: !!cat.poolId,
               descricao_categoria: '',
               unidade_label: undefined,
-              produtos: [...(cat.produtos || [])].sort((a, b) =>
-                a.nome.localeCompare(b.nome, 'pt-BR')
-              ),
+              produtos: [...(cat.produtos || [])].sort(sortByOrdem),
             };
           });
 
-          categorias.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+          categorias.sort(sortByOrdem);
 
           let horarios = {};
           try { if (apiData.configuracoes?.horarios_funcionamento) horarios = JSON.parse(apiData.configuracoes.horarios_funcionamento); } catch {}
