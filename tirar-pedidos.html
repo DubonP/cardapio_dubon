@@ -757,25 +757,12 @@
       />
       <nav class="tab-nav">
         <button class="tab-btn active" data-tab="pedido">Tirar Pedido</button>
-        <button class="tab-btn" data-tab="imprimir">Imprimir</button>
       </nav>
     </header>
 
     <!-- Aba: Tirar Pedido -->
     <div id="tab-pedido" class="tab-content active">
       <main id="menu"></main>
-    </div>
-
-    <!-- Aba: Imprimir (colar do WhatsApp) -->
-    <div id="tab-imprimir" class="tab-content">
-      <div class="imprimir-wrap">
-        <h2>Colar pedido do WhatsApp</h2>
-        <textarea
-          id="pedido-texto"
-          placeholder="Cole aqui a mensagem do pedido recebida pelo WhatsApp..."
-        ></textarea>
-        <button id="btn-imprimir-texto">🖨️ Imprimir</button>
-      </div>
     </div>
 
     <!-- Cart FAB -->
@@ -854,7 +841,7 @@
               </div>
             </div>
           </div>
-          <button id="print-btn">✅ Enviar e Imprimir</button>
+          <button id="print-btn">✅ Enviar</button>
         </div>
       </div>
     </div>
@@ -869,9 +856,6 @@
         </div>
       </div>
     </div>
-
-    <!-- Área de impressão (invisível na tela) -->
-    <div id="print-area"></div>
 
     <script>
       const API_URL = 'https://backdubon-production.up.railway.app';
@@ -893,16 +877,21 @@
         function normalizarCardapio(apiData) {
           const categorias = (apiData.categorias || []).map(cat => ({
             ...cat,
-            tipo: cat.tipo.toLowerCase() === 'picole' ? 'picole' : 'pote',
+            tipo: cat.tipo.toLowerCase(), // 'pote', 'picole', 'bebida', 'kilo'
             preco_unico: cat.precosPorQuantidade?.[0]
               ? parseFloat(cat.precosPorQuantidade[0].preco) : 0,
             precos_quantidade: Object.fromEntries(
               (cat.precosPorQuantidade || []).map(p => [String(p.quantidadeMinima), parseFloat(p.preco)])
             ),
+            precoKilo: cat.precoKilo ? parseFloat(cat.precoKilo) : 0,
             pool_quantidade: !!cat.poolId,
             descricao_categoria: '',
-            produtos: [...(cat.produtos || [])].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
-          })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+            produtos: [...(cat.produtos || [])].sort((a, b) =>
+              (a.ordem ?? 0) !== (b.ordem ?? 0) ? (a.ordem ?? 0) - (b.ordem ?? 0) : a.nome.localeCompare(b.nome, 'pt-BR')
+            ),
+          })).sort((a, b) =>
+            (a.ordem ?? 0) !== (b.ordem ?? 0) ? (a.ordem ?? 0) - (b.ordem ?? 0) : a.nome.localeCompare(b.nome, 'pt-BR')
+          );
           return { taxa_entrega: parseFloat(apiData.configuracoes?.taxa_entrega || '0'), categorias };
         }
 
@@ -936,7 +925,18 @@
         /* ── Picolé qty state + mapa de IDs ── */
         const picoleQty = {};
         const prodIdMap = {}; // catIdx -> { prodNome -> prodId }
+        /* ── Kilo qty state ── */
+        const kiloQty = {};
+        const kiloIdMap = {}; // catIdx -> { prodNome -> prodId }
         cardapio.categorias.forEach((cat, idx) => {
+          if (cat.tipo === "kilo") {
+            kiloQty[idx] = {};
+            kiloIdMap[idx] = {};
+            cat.produtos.forEach((p) => {
+              kiloQty[idx][p.nome] = 0;
+              kiloIdMap[idx][p.nome] = p.id;
+            });
+          }
           if (cat.tipo === "picole") {
             picoleQty[idx] = {};
             prodIdMap[idx] = {};
@@ -1094,6 +1094,7 @@
         /* ── Render menu ── */
         const menu = document.getElementById("menu");
         const picoleSummaryEls = {};
+        const kiloSummaryEls = {};
 
         cardapio.categorias.forEach((cat, idx) => {
           const card = document.createElement("div");
@@ -1113,13 +1114,15 @@
           const descDiv = document.createElement("div");
           descDiv.className = "preco-info";
 
-          if (cat.tipo === "pote") {
+          if (cat.tipo === "pote" || cat.tipo === "bebida") {
             const unidade =
               cat.unidade_label !== undefined ? cat.unidade_label : "pote";
             const precoLabel = unidade
               ? `${fmt(cat.preco_unico)} / ${unidade}`
               : fmt(cat.preco_unico);
             descDiv.innerHTML = `${cat.descricao_categoria} — <span class="price-tag">${precoLabel}</span>`;
+          } else if (cat.tipo === "kilo") {
+            descDiv.innerHTML = `${cat.descricao_categoria} — <span class="price-tag">${fmt(cat.precoKilo)}/kg</span>`;
           } else {
             descDiv.textContent = cat.descricao_categoria;
             const p = cat.precos_quantidade;
@@ -1148,7 +1151,7 @@
           const body = document.createElement("div");
           body.appendChild(descDiv);
 
-          if (cat.tipo === "pote") {
+          if (cat.tipo === "pote" || cat.tipo === "bebida") {
             const list = document.createElement("div");
             list.className = "flavor-list";
             cat.produtos.forEach((prod) => {
@@ -1174,7 +1177,7 @@
               list.appendChild(row);
             });
             body.appendChild(list);
-          } else {
+          } else if (cat.tipo === "picole") {
             const list = document.createElement("div");
             list.className = "picole-list";
             cat.produtos.forEach((prod) => {
@@ -1232,6 +1235,64 @@
             addBtn.textContent = "Adicionar ao pedido";
             addBtn.addEventListener("click", () => addPicoleToCart(idx, cat));
             body.appendChild(addBtn);
+          } else if (cat.tipo === "kilo") {
+            const list = document.createElement("div");
+            list.className = "picole-list";
+            cat.produtos.forEach((prod) => {
+              const row = document.createElement("div");
+              row.className = "picole-flavor-row";
+              const nameEl = document.createElement("span");
+              nameEl.className =
+                "picole-flavor-name" + (prod.disponivel ? "" : " disabled");
+              nameEl.textContent = prod.nome;
+              row.appendChild(nameEl);
+              const ctrl = document.createElement("div");
+              ctrl.className = "qty-ctrl";
+              const btnMinus = document.createElement("button");
+              btnMinus.className = "qty-btn";
+              btnMinus.textContent = "−";
+              btnMinus.disabled = !prod.disponivel;
+              const valEl = document.createElement("span");
+              valEl.className = "qty-val";
+              valEl.textContent = "0g";
+              const btnPlus = document.createElement("button");
+              btnPlus.className = "qty-btn";
+              btnPlus.textContent = "+";
+              btnPlus.disabled = !prod.disponivel;
+              if (prod.disponivel) {
+                btnMinus.addEventListener("click", () => {
+                  if (kiloQty[idx][prod.nome] > 0) {
+                    kiloQty[idx][prod.nome]--;
+                    valEl.textContent = (kiloQty[idx][prod.nome] * 100) + "g";
+                    updateKiloSummary(idx, cat);
+                  }
+                });
+                btnPlus.addEventListener("click", () => {
+                  kiloQty[idx][prod.nome]++;
+                  valEl.textContent = (kiloQty[idx][prod.nome] * 100) + "g";
+                  updateKiloSummary(idx, cat);
+                });
+              }
+              ctrl.appendChild(btnMinus);
+              ctrl.appendChild(valEl);
+              ctrl.appendChild(btnPlus);
+              row.appendChild(ctrl);
+              list.appendChild(row);
+            });
+            body.appendChild(list);
+
+            const summary = document.createElement("div");
+            summary.className = "picole-summary";
+            summary.innerHTML =
+              '<span>Total: <strong>0g</strong></span><span class="summary-total">R$ 0,00</span>';
+            kiloSummaryEls[idx] = summary;
+            body.appendChild(summary);
+
+            const addBtn = document.createElement("button");
+            addBtn.className = "add-btn";
+            addBtn.textContent = "Adicionar ao pedido";
+            addBtn.addEventListener("click", () => addKiloToCart(idx, cat));
+            body.appendChild(addBtn);
           }
 
           body.style.display = "none";
@@ -1258,6 +1319,55 @@
           cardapio.categorias.forEach((cat, idx) => {
             if (cat.tipo === "picole") updatePicoleSummary(idx, cat);
           });
+        }
+
+        /* ── Kilo summaries ── */
+        function updateKiloSummary(idx, cat) {
+          const el = kiloSummaryEls[idx];
+          if (!el) return;
+          const totalUnits = somaQty(kiloQty[idx]);
+          const totalGramas = totalUnits * 100;
+          const total = totalUnits * (cat.precoKilo / 10);
+          el.innerHTML = `<span>Total: <strong>${totalGramas}g</strong></span><span class="summary-total">${fmt(total)}</span>`;
+        }
+
+        function updateAllKiloSummaries() {
+          cardapio.categorias.forEach((cat, idx) => {
+            if (cat.tipo === "kilo") updateKiloSummary(idx, cat);
+          });
+        }
+
+        function addKiloToCart(catIdx, cat) {
+          const qtyMap = kiloQty[catIdx];
+          const total = somaQty(qtyMap);
+          if (total === 0) {
+            alert("Selecione ao menos 100g antes de adicionar.");
+            return;
+          }
+          const flavors = Object.entries(qtyMap)
+            .filter(([, q]) => q > 0)
+            .map(([nome, quantidade]) => ({ produtoId: kiloIdMap[catIdx][nome], nome, quantidade }));
+          const saborLabel = flavors
+            .map(f => `${f.nome} ${f.quantidade * 100}g`)
+            .join(", ");
+          const preco = cat.precoKilo / 10; // price per 100g unit
+          const totalPreco = Number((total * preco).toFixed(2));
+          cart.push({
+            id: nextId++,
+            flavors,
+            categoria: cat.nome,
+            emoji: cat.emoji,
+            tipo: "kilo",
+            saborLabel,
+            qty: total,
+            preco,
+            total: totalPreco,
+          });
+          Object.keys(kiloQty[catIdx]).forEach(k => { kiloQty[catIdx][k] = 0; });
+          const card = document.querySelectorAll(".categoria")[catIdx];
+          if (card) card.querySelectorAll(".qty-val").forEach(el => { el.textContent = "0g"; });
+          updateKiloSummary(catIdx, cat);
+          updateCartUI();
         }
 
         function onPicoleQtyChange(changedIdx, changedCat) {
@@ -1300,6 +1410,8 @@
             const unLabel =
               item.tipo === "pote"
                 ? `1 un × ${fmt(item.preco)}`
+                : item.tipo === "kilo"
+                ? `${item.qty * 100}g`
                 : `${item.qty} un × ${fmt(item.preco)}`;
             div.innerHTML = `
               <div class="cart-item-name">${item.categoria}</div>
@@ -1316,6 +1428,7 @@
               cart = cart.filter((i) => i.id !== Number(btn.dataset.id));
               recalcularCarrinhoPicole();
               updateAllPicoleSummaries();
+              updateAllKiloSummaries();
               updateCartUI();
             });
           });
@@ -1355,6 +1468,7 @@
           document.getElementById("troco-valor-wrap").style.display = "none";
           recalcularCarrinhoPicole();
           updateAllPicoleSummaries();
+          updateAllKiloSummaries();
           updateCartUI();
         }
         document.getElementById("cart-fab").addEventListener("click", openCart);
@@ -1428,89 +1542,7 @@
             document.getElementById("troco-valor-wrap").style.display = "block";
           });
 
-        /* ── Gerar recibo (texto para impressora 58mm) ── */
-        function gerarRecibo() {
-          const now = new Date();
-          const data = now.toLocaleDateString("pt-BR");
-          const hora = now.toLocaleTimeString("pt-BR", {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-          const SEP = "--------------------------------";
-          const TITLE = "================================";
-
-          let txt = "    SORVETERIA DUBON\n";
-          txt += "  Monte Azul Paulista, SP\n";
-          txt += TITLE + "\n";
-          txt += `${data}  ${hora}\n`;
-
-          const nome = document.getElementById("inp-nome").value.trim();
-          txt += `Cliente: ${nome}\n`;
-
-          txt += SEP + "\n";
-
-          let grandTotal = 0;
-          cart.forEach((item) => {
-            grandTotal += item.total;
-            txt += `${item.categoria}\n`;
-            txt += `  ${item.saborLabel}\n`;
-            if (item.tipo === "pote") {
-              txt += `  1 un  x  ${fmt(item.preco)}  =  ${fmt(item.total)}\n`;
-            } else {
-              txt += `  ${item.qty} un  x  ${fmt(item.preco)}  =  ${fmt(item.total)}\n`;
-            }
-            txt += "\n";
-          });
-
-          txt += SEP + "\n";
-
-          if (tipoEntrega === "retirada") {
-            txt += "Entrega: RETIRADA NA LOJA\n";
-          } else {
-            const rua = document.getElementById("inp-rua").value.trim();
-            const numero = document.getElementById("inp-numero").value.trim();
-            const bairro = document.getElementById("inp-bairro").value.trim();
-            const ref = document.getElementById("inp-referencia").value.trim();
-            txt += "Entrega:\n";
-            txt += `  ${rua}, ${numero}\n`;
-            txt += `  Bairro: ${bairro}\n`;
-            if (ref) txt += `  Ref: ${ref}\n`;
-          }
-
-          if (tipoEntrega === "entrega") {
-            txt += SEP + "\n";
-            if (formaPagamento === "dinheiro") {
-              const troco = document.getElementById("inp-troco").value.trim();
-              if (precisaTroco && troco) {
-                const trocoNum = parseFloat(troco.replace(",", "."));
-                const trocoFmt = !isNaN(trocoNum) ? trocoNum.toFixed(2).replace(".", ",") : troco;
-                txt += `PAGAMENTO: Dinheiro\n  Troco para: R$ ${trocoFmt}\n`;
-              } else if (precisaTroco) {
-                txt += `PAGAMENTO: Dinheiro (troco)\n`;
-              } else {
-                txt += `PAGAMENTO: Dinheiro (sem troco)\n`;
-              }
-            } else if (formaPagamento === "maquina") {
-              txt += `PAGAMENTO: Maquina (cartao/Pix QR)\n`;
-            } else if (formaPagamento === "pix") {
-              txt += `PAGAMENTO: Pix pela chave\n`;
-            }
-          }
-
-          txt += SEP + "\n";
-          let totalFinal = grandTotal;
-          if (tipoEntrega === "entrega" && taxaEntrega > 0) {
-            txt += `Subtotal: ${fmt(grandTotal)}\n`;
-            txt += `Taxa entrega: ${fmt(taxaEntrega)}\n`;
-            totalFinal += taxaEntrega;
-          }
-          txt += `** TOTAL: ${fmt(totalFinal)} **\n`;
-          txt += TITLE + "\n";
-
-          return txt;
-        }
-
-        /* ── Enviar pedido à API e imprimir ── */
+        /* ── Enviar pedido ── */
         document.getElementById("print-btn").addEventListener("click", async () => {
           if (cart.length === 0) { alert("Adicione itens ao pedido antes de enviar."); return; }
           const nome = document.getElementById("inp-nome").value.trim();
@@ -1581,30 +1613,15 @@
             const data = await res.json();
             if (!res.ok) { alert(data.error || 'Erro ao enviar pedido.'); return; }
 
-            document.getElementById("print-area").textContent = gerarRecibo();
-            window.print();
             limparCarrinho();
             closeCart();
           } catch {
             alert('Erro de conexão. Verifique a internet.');
           } finally {
             btn.disabled = false;
-            btn.textContent = "✅ Enviar e Imprimir";
+            btn.textContent = "✅ Enviar";
           }
         });
-
-        /* ── Imprimir (aba Imprimir — colar do WhatsApp) ── */
-        document
-          .getElementById("btn-imprimir-texto")
-          .addEventListener("click", () => {
-            const texto = document.getElementById("pedido-texto").value.trim();
-            if (!texto) {
-              alert("Cole o texto do pedido antes de imprimir.");
-              return;
-            }
-            document.getElementById("print-area").textContent = texto;
-            window.print();
-          });
 
         updateCartUI();
       })();

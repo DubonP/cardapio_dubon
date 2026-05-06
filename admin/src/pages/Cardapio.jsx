@@ -4,15 +4,16 @@ import Modal from '../components/Modal'
 
 const fmt = (v) => 'R$ ' + Number(v).toFixed(2).replace('.', ',')
 
-const TIPO_LABEL = { POTE: 'Pote', PICOLE: 'Picolé', BEBIDA: 'Bebida' }
+const TIPO_LABEL = { POTE: 'Pote', PICOLE: 'Picolé', BEBIDA: 'Bebida', KILO: 'Kg' }
 const TIPO_CLS = {
   POTE:   'bg-blue-100 text-blue-700',
   PICOLE: 'bg-pink-100 text-pink-700',
   BEBIDA: 'bg-green-100 text-green-700',
+  KILO:   'bg-orange-100 text-orange-700',
 }
 
-const INITIAL_CAT = { nome: '', tipo: 'POTE', preco: '' }
-const INITIAL_PROD = { nome: '' }
+const INITIAL_CAT = { nome: '', tipo: 'POTE', preco: '', precoKilo: '' }
+const INITIAL_PROD = { nome: '', ordem: 0 }
 
 export default function Cardapio() {
   const [cats, setCats] = useState([])
@@ -82,7 +83,11 @@ export default function Cardapio() {
     setSaving(true)
     try {
       if (catModal.mode === 'add') {
-        const { data } = await api.post('/api/admin/categorias', { nome: formData.nome, tipo: formData.tipo })
+        const catPayload = { nome: formData.nome, tipo: formData.tipo }
+        if (formData.tipo === 'KILO' && formData.precoKilo) {
+          catPayload.precoKilo = parseFloat(formData.precoKilo)
+        }
+        const { data } = await api.post('/api/admin/categorias', catPayload)
         const newCat = { ...data, produtos: [], precosPorQuantidade: [] }
         if (formData.preco && (formData.tipo === 'POTE' || formData.tipo === 'BEBIDA')) {
           await api.put(`/api/admin/categorias/${data.id}/precos`, [
@@ -92,14 +97,25 @@ export default function Cardapio() {
         }
         setCats(cs => [...cs, newCat])
       } else {
-        await api.patch(`/api/admin/categorias/${catModal.data.id}`, { nome: formData.nome })
-        if (formData.preco && (catModal.data.tipo === 'POTE' || catModal.data.tipo === 'BEBIDA')) {
+        const tipo = catModal.data.tipo
+        const updatePayload = { nome: formData.nome }
+        if (tipo === 'KILO' && formData.precoKilo) {
+          updatePayload.precoKilo = parseFloat(formData.precoKilo)
+        }
+        await api.patch(`/api/admin/categorias/${catModal.data.id}`, updatePayload)
+        if (formData.preco && (tipo === 'POTE' || tipo === 'BEBIDA')) {
           await api.put(`/api/admin/categorias/${catModal.data.id}/precos`, [
             { quantidadeMinima: 1, preco: parseFloat(formData.preco) },
           ])
           setCats(cs => cs.map(c =>
             c.id === catModal.data.id
               ? { ...c, nome: formData.nome, precosPorQuantidade: [{ quantidadeMinima: 1, preco: parseFloat(formData.preco) }] }
+              : c
+          ))
+        } else if (tipo === 'KILO') {
+          setCats(cs => cs.map(c =>
+            c.id === catModal.data.id
+              ? { ...c, nome: formData.nome, precoKilo: parseFloat(formData.precoKilo) || c.precoKilo }
               : c
           ))
         } else {
@@ -117,20 +133,24 @@ export default function Cardapio() {
   // ── Save product ─────────────────────────────────────────────
   async function saveProd(formData) {
     setSaving(true)
+    const ordem = parseInt(formData.ordem) || 0
     try {
       if (prodModal.mode === 'add') {
         const { data } = await api.post('/api/admin/produtos', {
           nome: formData.nome,
           categoriaId: prodModal.catId,
+          ordem,
         })
         setCats(cs => cs.map(c =>
-          c.id === prodModal.catId ? { ...c, produtos: [...c.produtos, { ...data, disponivel: true }] } : c
+          c.id === prodModal.catId
+            ? { ...c, produtos: [...c.produtos, { ...data, disponivel: true }].sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome)) }
+            : c
         ))
       } else {
-        await api.patch(`/api/admin/produtos/${prodModal.data.id}`, { nome: formData.nome })
+        await api.patch(`/api/admin/produtos/${prodModal.data.id}`, { nome: formData.nome, ordem })
         setCats(cs => cs.map(c =>
           c.id === prodModal.catId
-            ? { ...c, produtos: c.produtos.map(p => p.id === prodModal.data.id ? { ...p, nome: formData.nome } : p) }
+            ? { ...c, produtos: c.produtos.map(p => p.id === prodModal.data.id ? { ...p, nome: formData.nome, ordem } : p).sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome)) }
             : c
         ))
       }
@@ -216,7 +236,8 @@ export default function Cardapio() {
 function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleProd, onDeleteProd, onEditPrecos }) {
   const [open, setOpen] = useState(false)
   const isPicole = cat.tipo === 'PICOLE'
-  const simplePrice = !isPicole && cat.precosPorQuantidade?.[0]?.preco
+  const isKilo = cat.tipo === 'KILO'
+  const simplePrice = !isPicole && !isKilo && cat.precosPorQuantidade?.[0]?.preco
 
   return (
     <div className={`bg-white rounded-xl shadow-sm border transition-opacity ${cat.ativo ? '' : 'opacity-60'}`}>
@@ -237,6 +258,10 @@ function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleP
 
         {simplePrice && (
           <span className="text-sm text-gray-500 flex-shrink-0">{fmt(simplePrice)}</span>
+        )}
+
+        {isKilo && cat.precoKilo && (
+          <span className="text-sm text-gray-500 flex-shrink-0">{fmt(cat.precoKilo)}/kg</span>
         )}
 
         {isPicole && (
@@ -306,11 +331,13 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
     nome: initial.nome || '',
     tipo: initial.tipo || 'POTE',
     preco: initial.precosPorQuantidade?.[0]?.preco ?? '',
+    precoKilo: initial.precoKilo ?? '',
   })
 
   const isEdit = mode === 'edit'
   const tipo = isEdit ? initial.tipo : form.tipo
   const needsPrice = tipo === 'POTE' || tipo === 'BEBIDA'
+  const needsPrecoKilo = tipo === 'KILO'
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -347,6 +374,7 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
               <option value="POTE">Pote</option>
               <option value="PICOLE">Picolé</option>
               <option value="BEBIDA">Bebida</option>
+              <option value="KILO">Sorvete por Kg</option>
             </select>
           </Field>
         )}
@@ -365,6 +393,20 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
           </Field>
         )}
 
+        {needsPrecoKilo && (
+          <Field label="Preço por kg (R$)">
+            <input
+              className="input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.precoKilo}
+              onChange={e => set('precoKilo', e.target.value)}
+              placeholder="Ex: 25,00"
+            />
+          </Field>
+        )}
+
         {!isEdit && tipo === 'PICOLE' && (
           <p className="text-xs text-gray-400">Os preços por quantidade serão configurados após criar a categoria.</p>
         )}
@@ -376,6 +418,7 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
 // ── ProdFormModal ────────────────────────────────────────────────
 function ProdFormModal({ mode, initial, onSave, onClose, saving }) {
   const [nome, setNome] = useState(initial.nome || '')
+  const [ordem, setOrdem] = useState(initial.ordem ?? 0)
 
   return (
     <Modal
@@ -386,7 +429,7 @@ function ProdFormModal({ mode, initial, onSave, onClose, saving }) {
         <>
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancelar</button>
           <button
-            onClick={() => onSave({ nome })}
+            onClick={() => onSave({ nome, ordem })}
             disabled={saving || !nome}
             className="px-4 py-2 text-sm bg-brand text-white rounded-lg font-medium disabled:opacity-50"
           >
@@ -402,6 +445,16 @@ function ProdFormModal({ mode, initial, onSave, onClose, saving }) {
           onChange={e => setNome(e.target.value)}
           placeholder="Ex: Chocolate"
           autoFocus
+        />
+      </Field>
+      <Field label="Ordem (1 = primeiro no cardápio)">
+        <input
+          className="input"
+          type="number"
+          min="0"
+          value={ordem}
+          onChange={e => setOrdem(parseInt(e.target.value) || 0)}
+          placeholder="0"
         />
       </Field>
     </Modal>

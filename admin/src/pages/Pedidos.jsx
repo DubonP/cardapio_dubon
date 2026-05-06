@@ -15,7 +15,7 @@ const STATUS = {
 const PAG = { DINHEIRO: '💵 Dinheiro', MAQUINA: '💳 Cartão/QR', PIX: '📱 Pix' }
 
 function today() {
-  return new Date().toISOString().split('T')[0]
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
 }
 
 function gerarReciboHTML(pedido) {
@@ -25,10 +25,13 @@ function gerarReciboHTML(pedido) {
   })
 
   const itensHTML = pedido.itens
-    .map(
-      (item) =>
-        `<div class="row"><span>${item.produto.nome} ×${item.quantidade}</span><span>${fmt(item.totalItem)}</span></div>`,
-    )
+    .map((item) => {
+      const isKilo = item.produto.categoria?.tipo === 'KILO'
+      const label = isKilo
+        ? `${item.quantidade * 100}g × ${item.produto.nome}`
+        : `${item.quantidade} × ${item.produto.nome}`
+      return `<div class="row"><span>${label}</span><span>${fmt(item.totalItem)}</span></div>`
+    })
     .join('')
 
   const enderecoHTML =
@@ -79,7 +82,12 @@ function imprimirPedido(pedido) {
 
 function resumoItens(itens) {
   return itens
-    .map((i) => `${i.produto.nome} ×${i.quantidade}`)
+    .map((i) => {
+      const isKilo = i.produto.categoria?.tipo === 'KILO'
+      return isKilo
+        ? `${i.quantidade * 100}g × ${i.produto.nome}`
+        : `${i.quantidade} × ${i.produto.nome}`
+    })
     .join(' · ')
 }
 
@@ -299,6 +307,7 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onMsg, onPrint }) {
       {/* Checkboxes */}
       <div className="flex flex-wrap gap-x-4 gap-y-2 px-4 py-2 border-t border-gray-100 bg-gray-50">
         {[
+          { key: 'pago',        label: 'Pago' },
           { key: 'avisado',     label: 'Avisado' },
           { key: 'impresso',    label: 'Impresso' },
           { key: 'saiuEntrega', label: 'Saiu' },
@@ -388,11 +397,13 @@ function gerarReciboTexto(p) {
   ]
 
   p.itens.forEach((item) => {
-    const nome = item.produto.nome.substring(0, 20)
+    const isKilo = item.produto.categoria?.tipo === 'KILO'
+    const qty = isKilo ? `${item.quantidade * 100}g` : `${item.quantidade}x`
+    const nome = item.produto.nome.substring(0, W - qty.length - fmt(item.totalItem).length - 3)
     const val = fmt(item.totalItem)
-    const qty = `×${item.quantidade}`
-    const space = Math.max(1, W - nome.length - qty.length - val.length - 2)
-    lines.push(`${nome} ${qty}${' '.repeat(space)}${val}`)
+    const label = `${qty} ${nome}`
+    const space = Math.max(1, W - label.length - val.length)
+    lines.push(`${label}${' '.repeat(space)}${val}`)
   })
 
   lines.push(dash)
