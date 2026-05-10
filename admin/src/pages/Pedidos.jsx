@@ -37,9 +37,9 @@ function gerarReciboHTML(pedido) {
   const enderecoHTML =
     pedido.tipoEntrega === 'ENTREGA'
       ? `<div class="sec bold">ENTREGA:</div>
-         <div>${pedido.rua}, ${pedido.numero}</div>
-         <div>Bairro: ${pedido.bairro}</div>
-         ${pedido.referencia ? `<div>Ref: ${pedido.referencia}</div>` : ''}`
+         <div class="bold">${pedido.rua}, ${pedido.numero}</div>
+         <div class="bold">Bairro: ${pedido.bairro}</div>
+         ${pedido.referencia ? `<div class="bold">Ref: ${pedido.referencia}</div>` : ''}`
       : `<div class="center bold">★ RETIRADA NA LOJA ★</div>`
 
   const pagLabel = { DINHEIRO: 'Dinheiro', MAQUINA: 'Cartão/QR', PIX: 'Pix' }
@@ -47,7 +47,7 @@ function gerarReciboHTML(pedido) {
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Courier New',Courier,monospace;font-size:11px;width:52mm;padding:3mm}
+body{font-family:'Courier New',Courier,monospace;font-size:13px;width:58mm;padding:3mm 2mm 3mm 1mm;margin:0}
 @page{size:58mm auto;margin:0}
 .center{text-align:center}.bold{font-weight:bold}
 .div{border-top:1px dashed #000;margin:4px 0}
@@ -55,8 +55,8 @@ body{font-family:'Courier New',Courier,monospace;font-size:11px;width:52mm;paddi
 .row span:first-child{flex:1}
 .sec{margin-top:4px}
 </style></head><body>
-<div class="center bold" style="font-size:13px">SORVETERIA DUBON</div>
-<div class="center">Pedido #${pedido.numeroDia}</div>
+<div class="center bold" style="font-size:15px">SORVETERIA DUBON</div>
+<div class="center bold">Pedido #${pedido.numeroDia}</div>
 <div class="center">${dt}</div>
 <div class="div"></div>
 ${itensHTML}
@@ -66,9 +66,9 @@ ${Number(pedido.taxaEntrega) > 0 ? `<div class="row"><span>Taxa entrega</span><s
 <div class="div"></div>
 ${enderecoHTML}
 <div class="div"></div>
-<div>Pagamento: ${pagLabel[pedido.formaPagamento] || pedido.formaPagamento}</div>
+<div class="bold">Pagamento: ${pagLabel[pedido.formaPagamento] || pedido.formaPagamento}</div>
 ${pedido.trocoPara ? `<div>Troco para: ${fmt(pedido.trocoPara)}</div>` : ''}
-${pedido.pago ? `<div class="div"></div><div class="center bold" style="font-size:13px">✔ PAGO</div>` : ''}
+${pedido.pago ? `<div class="div"></div><div class="center bold" style="font-size:15px">✔ PAGO</div>` : ''}
 </body></html>`
 }
 
