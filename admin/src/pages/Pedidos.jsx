@@ -98,9 +98,12 @@ export default function Pedidos() {
   const [statusFilter, setStatusFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [printModal, setPrintModal] = useState(null)
-  const [editModal, setEditModal] = useState(null)   // pedido sendo editado
+  const [editModal, setEditModal] = useState(null)
   const [editForm, setEditForm] = useState({})
+  const [editItens, setEditItens] = useState([])
   const [editSaving, setEditSaving] = useState(false)
+  const [produtos, setProdutos] = useState([])
+  const [newItem, setNewItem] = useState({ produtoId: '', qtd: 1 })
 
   const fetchPedidos = useCallback(async () => {
     try {
@@ -155,39 +158,82 @@ export default function Pedidos() {
 
   const openEdit = (p) => {
     setEditForm({
-      clienteNome:    p.clienteNome    || '',
+      clienteNome:     p.clienteNome     || '',
       whatsappCliente: p.whatsappCliente || '',
-      tipoEntrega:    p.tipoEntrega,
-      rua:            p.rua            || '',
-      numero:         p.numero         || '',
-      bairro:         p.bairro         || '',
-      referencia:     p.referencia     || '',
-      formaPagamento: p.formaPagamento,
-      trocoPara:      p.trocoPara != null ? String(p.trocoPara) : '',
-      taxaEntrega:    String(p.taxaEntrega),
-      total:          String(p.total),
+      tipoEntrega:     p.tipoEntrega,
+      rua:             p.rua             || '',
+      numero:          p.numero          || '',
+      bairro:          p.bairro          || '',
+      referencia:      p.referencia      || '',
+      formaPagamento:  p.formaPagamento,
+      trocoPara:       p.trocoPara != null ? String(p.trocoPara) : '',
+      taxaEntrega:     String(p.taxaEntrega),
     })
+    setEditItens(p.itens.map((i) => ({
+      produtoId:     i.produtoId,
+      nome:          i.produto.nome,
+      tipo:          i.produto.categoria?.tipo,
+      quantidade:    i.quantidade,
+      precoUnitario: Number(i.precoUnitario),
+    })))
+    setNewItem({ produtoId: '', qtd: 1 })
+    if (produtos.length === 0) {
+      api.get('/api/admin/produtos').then(({ data }) => setProdutos(data)).catch(() => {})
+    }
     setEditModal(p)
+  }
+
+  const addEditItem = () => {
+    const prod = produtos.find((p) => p.id === parseInt(newItem.produtoId))
+    if (!prod) return
+    const isKilo = prod.categoria?.tipo === 'KILO'
+    const preco = isKilo
+      ? Number(prod.categoria.precoKilo || 0) / 10
+      : Number(prod.preco || 0)
+    setEditItens((prev) => [...prev, {
+      produtoId:     prod.id,
+      nome:          prod.nome,
+      tipo:          prod.categoria?.tipo,
+      quantidade:    Math.max(1, parseInt(newItem.qtd) || 1),
+      precoUnitario: preco,
+    }])
+    setNewItem({ produtoId: '', qtd: 1 })
+  }
+
+  const removeEditItem = (idx) =>
+    setEditItens((prev) => prev.filter((_, i) => i !== idx))
+
+  const changeEditItemQtd = (idx, val) => {
+    const qtd = Math.max(1, parseInt(val) || 1)
+    setEditItens((prev) => prev.map((item, i) => i === idx ? { ...item, quantidade: qtd } : item))
   }
 
   const handleEdit = async () => {
     if (!editModal) return
+    if (editItens.length === 0) { alert('O pedido deve ter ao menos 1 item'); return }
     setEditSaving(true)
     try {
-      const body = {
-        clienteNome:    editForm.clienteNome    || undefined,
+      // 1. Salva dados do pedido (incluindo taxaEntrega)
+      await api.patch(`/api/admin/pedidos/${editModal.id}`, {
+        clienteNome:     editForm.clienteNome     || undefined,
         whatsappCliente: editForm.whatsappCliente || null,
-        tipoEntrega:    editForm.tipoEntrega,
-        rua:            editForm.rua            || null,
-        numero:         editForm.numero         || null,
-        bairro:         editForm.bairro         || null,
-        referencia:     editForm.referencia     || null,
-        formaPagamento: editForm.formaPagamento,
-        trocoPara:      editForm.trocoPara !== '' ? parseFloat(editForm.trocoPara) : null,
-        taxaEntrega:    parseFloat(editForm.taxaEntrega),
-        total:          parseFloat(editForm.total),
-      }
-      const { data } = await api.patch(`/api/admin/pedidos/${editModal.id}`, body)
+        tipoEntrega:     editForm.tipoEntrega,
+        rua:             editForm.rua             || null,
+        numero:          editForm.numero          || null,
+        bairro:          editForm.bairro          || null,
+        referencia:      editForm.referencia      || null,
+        formaPagamento:  editForm.formaPagamento,
+        trocoPara:       editForm.trocoPara !== '' ? parseFloat(editForm.trocoPara) : null,
+        taxaEntrega:     parseFloat(editForm.taxaEntrega),
+      })
+      // 2. Salva itens e recalcula subtotal/total com a nova taxaEntrega
+      const { data } = await api.put(`/api/admin/pedidos/${editModal.id}/itens`, {
+        itens: editItens.map((i) => ({
+          produtoId:     i.produtoId,
+          quantidade:    i.quantidade,
+          precoUnitario: i.precoUnitario,
+        })),
+      })
       setPedidos((prev) => prev.map((p) => (p.id === data.id ? data : p)))
       setEditModal(null)
     } catch (err) {
@@ -364,8 +410,86 @@ export default function Pedidos() {
               </div>
             )}
 
+            {/* Itens do pedido */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-2">Itens do pedido</label>
+              <div className="space-y-1.5 mb-2">
+                {editItens.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                    <span className="flex-1 text-sm text-gray-700 truncate">
+                      {item.tipo === 'KILO' ? `${item.quantidade * 100}g` : `${item.quantidade}×`} {item.nome}
+                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => changeEditItemQtd(idx, item.quantidade - 1)}
+                        disabled={item.quantidade <= 1}
+                        className="w-6 h-6 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm font-bold disabled:opacity-40 leading-none"
+                      >−</button>
+                      <span className="w-6 text-center text-sm font-medium">{item.quantidade}</span>
+                      <button
+                        type="button"
+                        onClick={() => changeEditItemQtd(idx, item.quantidade + 1)}
+                        className="w-6 h-6 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm font-bold leading-none"
+                      >+</button>
+                    </div>
+                    <span className="text-sm font-medium text-gray-700 w-20 text-right shrink-0">
+                      {fmt(item.quantidade * item.precoUnitario)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeEditItem(idx)}
+                      className="text-red-400 hover:text-red-600 text-xl leading-none shrink-0"
+                    >×</button>
+                  </div>
+                ))}
+                {editItens.length === 0 && (
+                  <p className="text-xs text-red-500 px-1">Nenhum item — adicione ao menos 1 produto.</p>
+                )}
+              </div>
+
+              {/* Adicionar produto */}
+              <div className="flex gap-2">
+                <select
+                  value={newItem.produtoId}
+                  onChange={(e) => setNewItem((f) => ({ ...f, produtoId: e.target.value }))}
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                >
+                  <option value="">Selecionar produto…</option>
+                  {produtos.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.categoria?.nome ? `${p.categoria.nome} — ` : ''}{p.nome}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min="1"
+                  value={newItem.qtd}
+                  onChange={(e) => setNewItem((f) => ({ ...f, qtd: e.target.value }))}
+                  className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-brand"
+                />
+                <button
+                  type="button"
+                  onClick={addEditItem}
+                  disabled={!newItem.produtoId}
+                  className="px-3 py-1.5 text-sm rounded-lg bg-brand text-white hover:bg-brand-light disabled:opacity-40 shrink-0"
+                >
+                  + Adicionar
+                </button>
+              </div>
+
+              {editItens.length > 0 && (
+                <div className="flex justify-end mt-2 text-sm text-gray-500">
+                  Subtotal: <strong className="ml-1 text-gray-700">
+                    {fmt(editItens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0))}
+                  </strong>
+                </div>
+              )}
+            </div>
+
             {/* Pagamento */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Pagamento</label>
                 <select
@@ -377,6 +501,17 @@ export default function Pedidos() {
                   <option value="MAQUINA">💳 Cartão/QR</option>
                   <option value="DINHEIRO">💵 Dinheiro</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Taxa entrega (R$)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editForm.taxaEntrega}
+                  onChange={(e) => setEditForm((f) => ({ ...f, taxaEntrega: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                />
               </div>
               {editForm.formaPagamento === 'DINHEIRO' && (
                 <div>
@@ -391,28 +526,6 @@ export default function Pedidos() {
                   />
                 </div>
               )}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Taxa entrega (R$)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={editForm.taxaEntrega}
-                  onChange={(e) => setEditForm((f) => ({ ...f, taxaEntrega: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Total (R$)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={editForm.total}
-                  onChange={(e) => setEditForm((f) => ({ ...f, total: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-                />
-              </div>
             </div>
           </div>
         </Modal>
