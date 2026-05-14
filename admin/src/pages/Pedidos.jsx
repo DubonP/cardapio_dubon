@@ -47,7 +47,7 @@ function gerarReciboHTML(pedido) {
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Courier New',Courier,monospace;font-size:13px;width:58mm;padding:3mm 2mm 3mm 1mm;margin:0}
+body{font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:bold;width:48mm;padding:3mm 2mm 3mm 1mm;margin:0}
 @page{size:58mm auto;margin:0}
 .center{text-align:center}.bold{font-weight:bold}
 .div{border-top:1px dashed #000;margin:4px 0}
@@ -98,6 +98,9 @@ export default function Pedidos() {
   const [statusFilter, setStatusFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [printModal, setPrintModal] = useState(null)
+  const [editModal, setEditModal] = useState(null)   // pedido sendo editado
+  const [editForm, setEditForm] = useState({})
+  const [editSaving, setEditSaving] = useState(false)
 
   const fetchPedidos = useCallback(async () => {
     try {
@@ -147,6 +150,50 @@ export default function Pedidos() {
       }
     } catch (err) {
       alert(err.response?.data?.error || 'Erro ao gerar link')
+    }
+  }
+
+  const openEdit = (p) => {
+    setEditForm({
+      clienteNome:    p.clienteNome    || '',
+      whatsappCliente: p.whatsappCliente || '',
+      tipoEntrega:    p.tipoEntrega,
+      rua:            p.rua            || '',
+      numero:         p.numero         || '',
+      bairro:         p.bairro         || '',
+      referencia:     p.referencia     || '',
+      formaPagamento: p.formaPagamento,
+      trocoPara:      p.trocoPara != null ? String(p.trocoPara) : '',
+      taxaEntrega:    String(p.taxaEntrega),
+      total:          String(p.total),
+    })
+    setEditModal(p)
+  }
+
+  const handleEdit = async () => {
+    if (!editModal) return
+    setEditSaving(true)
+    try {
+      const body = {
+        clienteNome:    editForm.clienteNome    || undefined,
+        whatsappCliente: editForm.whatsappCliente || null,
+        tipoEntrega:    editForm.tipoEntrega,
+        rua:            editForm.rua            || null,
+        numero:         editForm.numero         || null,
+        bairro:         editForm.bairro         || null,
+        referencia:     editForm.referencia     || null,
+        formaPagamento: editForm.formaPagamento,
+        trocoPara:      editForm.trocoPara !== '' ? parseFloat(editForm.trocoPara) : null,
+        taxaEntrega:    parseFloat(editForm.taxaEntrega),
+        total:          parseFloat(editForm.total),
+      }
+      const { data } = await api.patch(`/api/admin/pedidos/${editModal.id}`, body)
+      setPedidos((prev) => prev.map((p) => (p.id === data.id ? data : p)))
+      setEditModal(null)
+    } catch (err) {
+      alert(err.response?.data?.error || 'Erro ao salvar pedido')
+    } finally {
+      setEditSaving(false)
     }
   }
 
@@ -209,9 +256,166 @@ export default function Pedidos() {
               onStatus={handleStatus}
               onMsg={handleMsg}
               onPrint={() => setPrintModal(p)}
+              onEdit={() => openEdit(p)}
             />
           ))}
         </div>
+      )}
+
+      {/* ── Modal de edição ── */}
+      {editModal && (
+        <Modal
+          title={`Editar Pedido #${editModal.numeroDia}`}
+          onClose={() => setEditModal(null)}
+          size="lg"
+          footer={
+            <>
+              <button
+                onClick={() => setEditModal(null)}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEdit}
+                disabled={editSaving}
+                className="px-4 py-2 text-sm rounded-lg bg-brand text-white hover:bg-brand-light disabled:opacity-50"
+              >
+                {editSaving ? 'Salvando…' : 'Salvar'}
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            {/* Nome e WhatsApp */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Nome do cliente</label>
+                <input
+                  type="text"
+                  value={editForm.clienteNome}
+                  onChange={(e) => setEditForm((f) => ({ ...f, clienteNome: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">WhatsApp</label>
+                <input
+                  type="text"
+                  value={editForm.whatsappCliente}
+                  onChange={(e) => setEditForm((f) => ({ ...f, whatsappCliente: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                />
+              </div>
+            </div>
+
+            {/* Tipo de entrega */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de entrega</label>
+              <select
+                value={editForm.tipoEntrega}
+                onChange={(e) => setEditForm((f) => ({ ...f, tipoEntrega: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+              >
+                <option value="ENTREGA">🛵 Entrega</option>
+                <option value="RETIRADA">🏪 Retirada</option>
+              </select>
+            </div>
+
+            {/* Endereço (só se ENTREGA) */}
+            {editForm.tipoEntrega === 'ENTREGA' && (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Rua</label>
+                  <input
+                    type="text"
+                    value={editForm.rua}
+                    onChange={(e) => setEditForm((f) => ({ ...f, rua: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Número</label>
+                  <input
+                    type="text"
+                    value={editForm.numero}
+                    onChange={(e) => setEditForm((f) => ({ ...f, numero: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Bairro</label>
+                  <input
+                    type="text"
+                    value={editForm.bairro}
+                    onChange={(e) => setEditForm((f) => ({ ...f, bairro: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Referência</label>
+                  <input
+                    type="text"
+                    value={editForm.referencia}
+                    onChange={(e) => setEditForm((f) => ({ ...f, referencia: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Pagamento */}
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Pagamento</label>
+                <select
+                  value={editForm.formaPagamento}
+                  onChange={(e) => setEditForm((f) => ({ ...f, formaPagamento: e.target.value, trocoPara: '' }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                >
+                  <option value="PIX">📱 Pix</option>
+                  <option value="MAQUINA">💳 Cartão/QR</option>
+                  <option value="DINHEIRO">💵 Dinheiro</option>
+                </select>
+              </div>
+              {editForm.formaPagamento === 'DINHEIRO' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Troco para (R$)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editForm.trocoPara}
+                    onChange={(e) => setEditForm((f) => ({ ...f, trocoPara: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Taxa entrega (R$)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editForm.taxaEntrega}
+                  onChange={(e) => setEditForm((f) => ({ ...f, taxaEntrega: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Total (R$)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editForm.total}
+                  onChange={(e) => setEditForm((f) => ({ ...f, total: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                />
+              </div>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* ── Modal de impressão ── */}
@@ -251,7 +455,7 @@ export default function Pedidos() {
 }
 
 /* ── Card de pedido ── */
-function PedidoCard({ pedido: p, onFlag, onStatus, onMsg, onPrint }) {
+function PedidoCard({ pedido: p, onFlag, onStatus, onMsg, onPrint, onEdit }) {
   const statusInfo = STATUS[p.status] || STATUS.RECEBIDO
   const isEntrega = p.tipoEntrega === 'ENTREGA'
 
@@ -339,6 +543,12 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onMsg, onPrint }) {
 
       {/* Ações */}
       <div className="flex flex-wrap gap-2 px-4 py-3 border-t border-gray-100">
+        <button
+          onClick={onEdit}
+          className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium"
+        >
+          ✏️ Editar
+        </button>
         <button
           onClick={onPrint}
           className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium"
