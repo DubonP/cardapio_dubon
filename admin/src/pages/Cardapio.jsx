@@ -12,8 +12,8 @@ const TIPO_CLS = {
   KILO:   'bg-orange-100 text-orange-700',
 }
 
-const INITIAL_CAT = { nome: '', tipo: 'POTE', preco: '', precoKilo: '' }
-const INITIAL_PROD = { nome: '', ordem: 0 }
+const INITIAL_CAT = { nome: '', tipo: 'POTE', preco: '', precoKilo: '', descricao: '' }
+const INITIAL_PROD = { nome: '', ordem: 0, descricao: '', tamanho: '' }
 
 function sortProdutos(a, b) {
   const oa = a.ordem ?? 0, ob = b.ordem ?? 0
@@ -91,7 +91,7 @@ export default function Cardapio() {
     setSaving(true)
     try {
       if (catModal.mode === 'add') {
-        const catPayload = { nome: formData.nome, tipo: formData.tipo, ordem: parseInt(formData.ordem) || 0 }
+        const catPayload = { nome: formData.nome, tipo: formData.tipo, ordem: parseInt(formData.ordem) || 0, descricao: formData.descricao || null }
         if (formData.tipo === 'KILO' && formData.precoKilo) {
           catPayload.precoKilo = parseFloat(formData.precoKilo)
         }
@@ -106,7 +106,7 @@ export default function Cardapio() {
         setCats(cs => [...cs, newCat].sort(sortProdutos))
       } else {
         const tipo = catModal.data.tipo
-        const updatePayload = { nome: formData.nome, ordem: parseInt(formData.ordem) || 0 }
+        const updatePayload = { nome: formData.nome, ordem: parseInt(formData.ordem) || 0, descricao: formData.descricao || null }
         if (tipo === 'KILO' && formData.precoKilo) {
           updatePayload.precoKilo = parseFloat(formData.precoKilo)
         }
@@ -150,6 +150,8 @@ export default function Cardapio() {
           nome: formData.nome,
           categoriaId: prodModal.catId,
           ordem,
+          descricao: formData.descricao || null,
+          tamanho: formData.tamanho || null,
         })
         setCats(cs => cs.map(c =>
           c.id === prodModal.catId
@@ -157,10 +159,10 @@ export default function Cardapio() {
             : c
         ))
       } else {
-        await api.patch(`/api/admin/produtos/${prodModal.data.id}`, { nome: formData.nome, ordem })
+        await api.patch(`/api/admin/produtos/${prodModal.data.id}`, { nome: formData.nome, ordem, descricao: formData.descricao || null, tamanho: formData.tamanho || null })
         setCats(cs => cs.map(c =>
           c.id === prodModal.catId
-            ? { ...c, produtos: c.produtos.map(p => p.id === prodModal.data.id ? { ...p, nome: formData.nome, ordem } : p).sort(sortProdutos) }
+            ? { ...c, produtos: c.produtos.map(p => p.id === prodModal.data.id ? { ...p, nome: formData.nome, ordem, descricao: formData.descricao || null, tamanho: formData.tamanho || null } : p).sort(sortProdutos) }
             : c
         ))
       }
@@ -263,7 +265,12 @@ function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleP
           {TIPO_LABEL[cat.tipo]}
         </span>
 
-        <span className="font-semibold text-gray-800 flex-1 min-w-0 truncate">{cat.nome}</span>
+        <div className="flex-1 min-w-0">
+          <span className="font-semibold text-gray-800 truncate block">{cat.nome}</span>
+          {cat.descricao && (
+            <span className="text-xs text-gray-400 truncate block">{cat.descricao}</span>
+          )}
+        </div>
 
         {!open && cat.produtos.length > 0 && (
           <span className="text-xs text-gray-400 flex-shrink-0">{cat.produtos.length} sabores</span>
@@ -310,7 +317,17 @@ function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleP
               <span className="text-xs font-mono text-gray-400 w-5 text-right flex-shrink-0 select-none">
                 {prod.ordem > 0 ? prod.ordem : '·'}
               </span>
-              <span className="flex-1 text-sm text-gray-700">{prod.nome}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-gray-700">{prod.nome}</span>
+                  {prod.tamanho && (
+                    <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{prod.tamanho}</span>
+                  )}
+                </div>
+                {prod.descricao && (
+                  <p className="text-xs text-gray-400 truncate mt-0.5">{prod.descricao}</p>
+                )}
+              </div>
               <button onClick={() => onEditProd(prod)} className="text-gray-300 hover:text-gray-500 p-1 flex-shrink-0">✏️</button>
               <button onClick={() => onDeleteProd(prod.id)} className="text-gray-300 hover:text-red-400 p-1 flex-shrink-0">🗑️</button>
               <div className="flex-shrink-0">
@@ -344,11 +361,12 @@ function Toggle({ checked, onChange }) {
 // ── CatFormModal ─────────────────────────────────────────────────
 function CatFormModal({ mode, initial, onSave, onClose, saving }) {
   const [form, setForm] = useState({
-    nome: initial.nome || '',
-    tipo: initial.tipo || 'POTE',
-    preco: initial.precosPorQuantidade?.[0]?.preco ?? '',
+    nome:      initial.nome      || '',
+    tipo:      initial.tipo      || 'POTE',
+    preco:     initial.precosPorQuantidade?.[0]?.preco ?? '',
     precoKilo: initial.precoKilo ?? '',
-    ordem: initial.ordem ?? 0,
+    ordem:     initial.ordem     ?? 0,
+    descricao: initial.descricao || '',
   })
 
   const isEdit = mode === 'edit'
@@ -428,6 +446,16 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
           <p className="text-xs text-gray-400">Os preços por quantidade serão configurados após criar a categoria.</p>
         )}
 
+        <Field label="Descrição (opcional)">
+          <textarea
+            className="input resize-none"
+            rows={3}
+            value={form.descricao}
+            onChange={e => set('descricao', e.target.value)}
+            placeholder="Ex: Potes de sorvete artesanal de 300ml, ideais para 2 pessoas"
+          />
+        </Field>
+
         <Field label="Ordem no cardápio (1 = primeiro)">
           <input
             className="input"
@@ -445,20 +473,25 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
 
 // ── ProdFormModal ────────────────────────────────────────────────
 function ProdFormModal({ mode, initial, onSave, onClose, saving }) {
-  const [nome, setNome] = useState(initial.nome || '')
-  const [ordem, setOrdem] = useState(initial.ordem ?? 0)
+  const [form, setForm] = useState({
+    nome:      initial.nome      || '',
+    ordem:     initial.ordem     ?? 0,
+    tamanho:   initial.tamanho   || '',
+    descricao: initial.descricao || '',
+  })
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
   return (
     <Modal
       title={mode === 'edit' ? 'Editar sabor' : 'Novo sabor'}
       onClose={onClose}
-      size="sm"
       footer={
         <>
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancelar</button>
           <button
-            onClick={() => onSave({ nome, ordem })}
-            disabled={saving || !nome}
+            onClick={() => onSave(form)}
+            disabled={saving || !form.nome}
             className="px-4 py-2 text-sm bg-brand text-white rounded-lg font-medium disabled:opacity-50"
           >
             {saving ? 'Salvando…' : 'Salvar'}
@@ -466,25 +499,44 @@ function ProdFormModal({ mode, initial, onSave, onClose, saving }) {
         </>
       }
     >
-      <Field label="Nome do sabor">
-        <input
-          className="input"
-          value={nome}
-          onChange={e => setNome(e.target.value)}
-          placeholder="Ex: Chocolate"
-          autoFocus
-        />
-      </Field>
-      <Field label="Ordem (1 = primeiro no cardápio)">
-        <input
-          className="input"
-          type="number"
-          min="0"
-          value={ordem}
-          onChange={e => setOrdem(parseInt(e.target.value) || 0)}
-          placeholder="0"
-        />
-      </Field>
+      <div className="space-y-4">
+        <Field label="Nome do sabor">
+          <input
+            className="input"
+            value={form.nome}
+            onChange={e => set('nome', e.target.value)}
+            placeholder="Ex: Chocolate"
+            autoFocus
+          />
+        </Field>
+        <Field label="Tamanho (opcional)">
+          <input
+            className="input"
+            value={form.tamanho}
+            onChange={e => set('tamanho', e.target.value)}
+            placeholder="Ex: 1,5L · 300ml · 500g"
+          />
+        </Field>
+        <Field label="Descrição (opcional)">
+          <textarea
+            className="input resize-none"
+            rows={3}
+            value={form.descricao}
+            onChange={e => set('descricao', e.target.value)}
+            placeholder="Ex: Sorvete cremoso de chocolate belga com calda"
+          />
+        </Field>
+        <Field label="Ordem (1 = primeiro no cardápio)">
+          <input
+            className="input"
+            type="number"
+            min="0"
+            value={form.ordem}
+            onChange={e => set('ordem', parseInt(e.target.value) || 0)}
+            placeholder="0"
+          />
+        </Field>
+      </div>
     </Modal>
   )
 }
