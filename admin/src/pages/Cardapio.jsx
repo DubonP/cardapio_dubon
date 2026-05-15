@@ -4,16 +4,19 @@ import Modal from '../components/Modal'
 
 const fmt = (v) => 'R$ ' + Number(v).toFixed(2).replace('.', ',')
 
-const TIPO_LABEL = { POTE: 'Pote', PICOLE: 'Picolé', BEBIDA: 'Bebida', KILO: 'Kg' }
+const TIPO_LABEL = { POTE: 'Pote', PICOLE: 'Picolé', BEBIDA: 'Bebida', KILO: 'Kg', CASQUINHA: 'Casquinha' }
 const TIPO_CLS = {
-  POTE:   'bg-blue-100 text-blue-700',
-  PICOLE: 'bg-pink-100 text-pink-700',
-  BEBIDA: 'bg-green-100 text-green-700',
-  KILO:   'bg-orange-100 text-orange-700',
+  POTE:     'bg-blue-100 text-blue-700',
+  PICOLE:   'bg-pink-100 text-pink-700',
+  BEBIDA:   'bg-green-100 text-green-700',
+  KILO:     'bg-orange-100 text-orange-700',
+  CASQUINHA:'bg-amber-100 text-amber-700',
 }
+const SUBTIPO_LABEL = { UNIDADE: 'Unidade', PACOTE: 'Pacote' }
+const SUBTIPO_CLS   = { UNIDADE: 'bg-gray-100 text-gray-600', PACOTE: 'bg-indigo-100 text-indigo-700' }
 
-const INITIAL_CAT = { nome: '', tipo: 'POTE', preco: '', precoKilo: '', descricao: '' }
-const INITIAL_PROD = { nome: '', ordem: 0, descricao: '', tamanho: '' }
+const INITIAL_CAT  = { nome: '', tipo: 'POTE', preco: '', precoKilo: '', descricao: '' }
+const INITIAL_PROD = { nome: '', ordem: 0, descricao: '', tamanho: '', subtipo: 'UNIDADE', preco: '' }
 
 function sortProdutos(a, b) {
   const oa = a.ordem ?? 0, ob = b.ordem ?? 0
@@ -144,14 +147,19 @@ export default function Cardapio() {
   async function saveProd(formData) {
     setSaving(true)
     const ordem = parseInt(formData.ordem) || 0
+    const isCasquinha = prodModal.catTipo === 'CASQUINHA'
     try {
+      const extra = isCasquinha
+        ? { subtipo: formData.subtipo, preco: parseFloat(formData.preco) || null }
+        : { tamanho: formData.tamanho || null }
+
       if (prodModal.mode === 'add') {
         const { data } = await api.post('/api/admin/produtos', {
           nome: formData.nome,
           categoriaId: prodModal.catId,
           ordem,
           descricao: formData.descricao || null,
-          tamanho: formData.tamanho || null,
+          ...extra,
         })
         setCats(cs => cs.map(c =>
           c.id === prodModal.catId
@@ -159,10 +167,18 @@ export default function Cardapio() {
             : c
         ))
       } else {
-        await api.patch(`/api/admin/produtos/${prodModal.data.id}`, { nome: formData.nome, ordem, descricao: formData.descricao || null, tamanho: formData.tamanho || null })
+        await api.patch(`/api/admin/produtos/${prodModal.data.id}`, {
+          nome: formData.nome, ordem,
+          descricao: formData.descricao || null,
+          ...extra,
+        })
         setCats(cs => cs.map(c =>
           c.id === prodModal.catId
-            ? { ...c, produtos: c.produtos.map(p => p.id === prodModal.data.id ? { ...p, nome: formData.nome, ordem, descricao: formData.descricao || null, tamanho: formData.tamanho || null } : p).sort(sortProdutos) }
+            ? { ...c, produtos: c.produtos.map(p =>
+                p.id === prodModal.data.id
+                  ? { ...p, nome: formData.nome, ordem, descricao: formData.descricao || null, ...extra }
+                  : p
+              ).sort(sortProdutos) }
             : c
         ))
       }
@@ -221,6 +237,7 @@ export default function Cardapio() {
       {prodModal && (
         <ProdFormModal
           mode={prodModal.mode}
+          catTipo={prodModal.catTipo}
           initial={prodModal.data}
           onSave={saveProd}
           onClose={() => setProdModal(null)}
@@ -320,8 +337,16 @@ function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleP
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm text-gray-700">{prod.nome}</span>
-                  {prod.tamanho && (
+                  {prod.subtipo && (
+                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${SUBTIPO_CLS[prod.subtipo] || 'bg-gray-100 text-gray-500'}`}>
+                      {SUBTIPO_LABEL[prod.subtipo] || prod.subtipo}
+                    </span>
+                  )}
+                  {prod.tamanho && !prod.subtipo && (
                     <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{prod.tamanho}</span>
+                  )}
+                  {prod.preco != null && cat.tipo === 'CASQUINHA' && (
+                    <span className="text-xs text-gray-500">{fmt(prod.preco)}</span>
                   )}
                 </div>
                 {prod.descricao && (
@@ -410,6 +435,7 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
               <option value="PICOLE">Picolé</option>
               <option value="BEBIDA">Bebida</option>
               <option value="KILO">Sorvete por Kg</option>
+              <option value="CASQUINHA">Casquinha</option>
             </select>
           </Field>
         )}
@@ -472,19 +498,26 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
 }
 
 // ── ProdFormModal ────────────────────────────────────────────────
-function ProdFormModal({ mode, initial, onSave, onClose, saving }) {
+function ProdFormModal({ mode, catTipo, initial, onSave, onClose, saving }) {
+  const isCasquinha = catTipo === 'CASQUINHA'
   const [form, setForm] = useState({
     nome:      initial.nome      || '',
     ordem:     initial.ordem     ?? 0,
     tamanho:   initial.tamanho   || '',
     descricao: initial.descricao || '',
+    subtipo:   initial.subtipo   || 'UNIDADE',
+    preco:     initial.preco     != null ? String(initial.preco) : '',
   })
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
+  const titulo = isCasquinha
+    ? (mode === 'edit' ? 'Editar casquinha' : 'Nova casquinha')
+    : (mode === 'edit' ? 'Editar sabor' : 'Novo sabor')
+
   return (
     <Modal
-      title={mode === 'edit' ? 'Editar sabor' : 'Novo sabor'}
+      title={titulo}
       onClose={onClose}
       footer={
         <>
@@ -500,30 +533,54 @@ function ProdFormModal({ mode, initial, onSave, onClose, saving }) {
       }
     >
       <div className="space-y-4">
-        <Field label="Nome do sabor">
+        <Field label={isCasquinha ? 'Nome da casquinha' : 'Nome do sabor'}>
           <input
             className="input"
             value={form.nome}
             onChange={e => set('nome', e.target.value)}
-            placeholder="Ex: Chocolate"
+            placeholder={isCasquinha ? 'Ex: Cascão Biju' : 'Ex: Chocolate'}
             autoFocus
           />
         </Field>
-        <Field label="Tamanho (opcional)">
-          <input
-            className="input"
-            value={form.tamanho}
-            onChange={e => set('tamanho', e.target.value)}
-            placeholder="Ex: 1,5L · 300ml · 500g"
-          />
-        </Field>
+
+        {isCasquinha ? (
+          <>
+            <Field label="Tipo">
+              <select className="input" value={form.subtipo} onChange={e => set('subtipo', e.target.value)}>
+                <option value="UNIDADE">Unidade</option>
+                <option value="PACOTE">Pacote</option>
+              </select>
+            </Field>
+            <Field label="Preço (R$)">
+              <input
+                className="input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.preco}
+                onChange={e => set('preco', e.target.value)}
+                placeholder="0,00"
+              />
+            </Field>
+          </>
+        ) : (
+          <Field label="Tamanho (opcional)">
+            <input
+              className="input"
+              value={form.tamanho}
+              onChange={e => set('tamanho', e.target.value)}
+              placeholder="Ex: 1,5L · 300ml · 500g"
+            />
+          </Field>
+        )}
+
         <Field label="Descrição (opcional)">
           <textarea
             className="input resize-none"
             rows={3}
             value={form.descricao}
             onChange={e => set('descricao', e.target.value)}
-            placeholder="Ex: Sorvete cremoso de chocolate belga com calda"
+            placeholder={isCasquinha ? 'Ex: Cascão crocante de chocolate' : 'Ex: Sorvete cremoso de chocolate belga'}
           />
         </Field>
         <Field label="Ordem (1 = primeiro no cardápio)">
