@@ -1,6 +1,32 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../lib/api'
 import Modal from '../components/Modal'
+
+function playNotificationSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    ;[0, 0.18].forEach((delay) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = 880
+      osc.type = 'sine'
+      gain.gain.setValueAtTime(0.4, ctx.currentTime + delay)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.4)
+      osc.start(ctx.currentTime + delay)
+      osc.stop(ctx.currentTime + delay + 0.4)
+    })
+  } catch {}
+}
+
+function showOrderNotification(pedido) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+  new Notification(`🍦 Novo pedido #${pedido.numeroDia}`, {
+    body: `${pedido.clienteNome || 'Cliente'} · R$ ${Number(pedido.total).toFixed(2).replace('.', ',')}`,
+    icon: '/favicon.ico',
+  })
+}
 
 const fmt = (v) => 'R$ ' + Number(v).toFixed(2).replace('.', ',')
 
@@ -103,7 +129,8 @@ export default function Pedidos() {
   const [editItens, setEditItens] = useState([])
   const [editSaving, setEditSaving] = useState(false)
   const [produtos, setProdutos] = useState([])
-  const [newItem, setNewItem] = useState({ produtoId: '', qtd: 1 })
+  const [newItem, setNewItem] = useState({ produtoId: '', qtd: 1, preco: '' })
+  const prevOrderIds = useRef(null)  // null = primeira carga (sem notificação)
 
   const fetchPedidos = useCallback(async () => {
     try {
@@ -111,12 +138,28 @@ export default function Pedidos() {
       if (statusFilter) params.status = statusFilter
       const { data } = await api.get('/api/admin/pedidos', { params })
       setPedidos(data)
+
+      // Detecta pedidos novos (ignora primeira carga)
+      if (prevOrderIds.current !== null) {
+        const novos = data.filter((p) => !prevOrderIds.current.has(p.id))
+        if (novos.length > 0) {
+          playNotificationSound()
+          novos.forEach((p) => showOrderNotification(p))
+        }
+      }
+      prevOrderIds.current = new Set(data.map((p) => p.id))
     } catch {
       // silencia erros de polling
     } finally {
       setLoading(false)
     }
   }, [date, statusFilter])
+
+  useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -176,7 +219,7 @@ export default function Pedidos() {
       quantidade:    i.quantidade,
       precoUnitario: Number(i.precoUnitario),
     })))
-    setNewItem({ produtoId: '', qtd: 1 })
+    setNewItem({ produtoId: '', qtd: 1, preco: '' })
     if (produtos.length === 0) {
       api.get('/api/admin/produtos').then(({ data }) => setProdutos(data)).catch(() => {})
     }
@@ -186,18 +229,21 @@ export default function Pedidos() {
   const addEditItem = () => {
     const prod = produtos.find((p) => p.id === parseInt(newItem.produtoId))
     if (!prod) return
-    const isKilo = prod.categoria?.tipo === 'KILO'
-    const preco = isKilo
-      ? Number(prod.categoria.precoKilo || 0) / 10
-      : Number(prod.preco || 0)
     setEditItens((prev) => [...prev, {
       produtoId:     prod.id,
       nome:          prod.nome,
       tipo:          prod.categoria?.tipo,
       quantidade:    Math.max(1, parseInt(newItem.qtd) || 1),
-      precoUnitario: preco,
+      precoUnitario: parseFloat(newItem.preco) || 0,
     }])
-    setNewItem({ produtoId: '', qtd: 1 })
+    setNewItem({ produtoId: '', qtd: 1, preco: '' })
+  }
+
+  const calcPrecoDefault = (prod) => {
+    if (!prod) return ''
+    const isKilo = prod.categoria?.tipo === 'KILO'
+    const v = isKilo ? Number(prod.categoria?.precoKilo || 0) / 10 : Number(prod.preco || 0)
+    return v > 0 ? String(v) : ''
   }
 
   const removeEditItem = (idx) =>
@@ -449,11 +495,14 @@ export default function Pedidos() {
               </div>
 
               {/* Adicionar produto */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <select
                   value={newItem.produtoId}
-                  onChange={(e) => setNewItem((f) => ({ ...f, produtoId: e.target.value }))}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                  onChange={(e) => {
+                    const prod = produtos.find((p) => p.id === parseInt(e.target.value))
+                    setNewItem((f) => ({ ...f, produtoId: e.target.value, preco: calcPrecoDefault(prod) }))
+                  }}
+                  className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                 >
                   <option value="">Selecionar produto…</option>
                   {produtos.map((p) => (
@@ -467,7 +516,17 @@ export default function Pedidos() {
                   min="1"
                   value={newItem.qtd}
                   onChange={(e) => setNewItem((f) => ({ ...f, qtd: e.target.value }))}
-                  className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-brand"
+                  className="w-14 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-brand"
+                  placeholder="Qtd"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={newItem.preco}
+                  onChange={(e) => setNewItem((f) => ({ ...f, preco: e.target.value }))}
+                  className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-brand"
+                  placeholder="R$ preço"
                 />
                 <button
                   type="button"
