@@ -190,6 +190,22 @@ export default function Cardapio() {
     }
   }
 
+  async function deleteCat(cat) {
+    if (cat.produtos?.length > 0) {
+      alert(`Não é possível excluir "${cat.nome}" pois ela tem ${cat.produtos.length} sabor(es) vinculado(s). Exclua os sabores primeiro.`)
+      return
+    }
+    if (!confirm(`Excluir a categoria "${cat.nome}"?`)) return
+    const prev = cats
+    setCats(cs => cs.filter(c => c.id !== cat.id))
+    try {
+      await api.delete(`/api/admin/categorias/${cat.id}`)
+    } catch (err) {
+      setCats(prev)
+      alert(err.response?.data?.error || 'Erro ao excluir categoria')
+    }
+  }
+
   if (loading) return <div className="text-center py-16 text-gray-400">Carregando…</div>
   if (err)     return <div className="text-center py-16 text-red-500">{err}</div>
 
@@ -216,6 +232,7 @@ export default function Cardapio() {
             onEditProd={(prod) => setProdModal({ mode: 'edit', catId: cat.id, catTipo: cat.tipo, data: prod })}
             onToggleProd={(prod) => toggleProd(cat.id, prod)}
             onDeleteProd={(prodId) => deleteProd(cat.id, prodId)}
+            onDeleteCat={() => deleteCat(cat)}
             onEditPrecos={() => setPrecoModal({ cat })}
           />
         ))}
@@ -262,7 +279,7 @@ export default function Cardapio() {
 }
 
 // ── CatCard ──────────────────────────────────────────────────────
-function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleProd, onDeleteProd, onEditPrecos }) {
+function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleProd, onDeleteProd, onDeleteCat, onEditPrecos }) {
   const [open, setOpen] = useState(false)
   const isPicole = cat.tipo === 'PICOLE'
   const isKilo = cat.tipo === 'KILO'
@@ -315,6 +332,13 @@ function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleP
           className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0"
         >
           ✏️
+        </button>
+        <button
+          onClick={e => { e.stopPropagation(); onDeleteCat() }}
+          className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0"
+          title="Excluir categoria"
+        >
+          🗑️
         </button>
 
         <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
