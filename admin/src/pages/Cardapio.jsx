@@ -83,9 +83,9 @@ export default function Cardapio() {
     ))
     try {
       await api.delete(`/api/admin/produtos/${prodId}`)
-    } catch {
+    } catch (err) {
       setCats(prev)
-      alert('Erro ao excluir produto')
+      alert(err.response?.data?.error || 'Erro ao excluir produto')
     }
   }
 

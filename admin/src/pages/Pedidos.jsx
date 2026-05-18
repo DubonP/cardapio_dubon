@@ -52,10 +52,11 @@ function gerarReciboHTML(pedido) {
 
   const itensHTML = pedido.itens
     .map((item) => {
-      const isKilo = item.produto.categoria?.tipo === 'KILO'
+      const isKilo = item.produto?.categoria?.tipo === 'KILO'
+      const nome = item.produto?.nome ?? '(produto removido)'
       const label = isKilo
-        ? `${item.quantidade * 100}g × ${item.produto.nome}`
-        : `${item.quantidade} × ${item.produto.nome}`
+        ? `${item.quantidade * 100}g × ${nome}`
+        : `${item.quantidade} × ${nome}`
       const obsHTML = isKilo && item.observacao
         ? `<div style="font-size:11px;padding-left:4px;color:#444">↳ ${item.observacao}</div>`
         : ''
@@ -113,10 +114,11 @@ function imprimirPedido(pedido) {
 function resumoItens(itens) {
   return itens
     .map((i) => {
-      const isKilo = i.produto.categoria?.tipo === 'KILO'
+      const isKilo = i.produto?.categoria?.tipo === 'KILO'
+      const nome = i.produto?.nome ?? '(produto removido)'
       const label = isKilo
-        ? `${i.quantidade * 100}g × ${i.produto.nome}`
-        : `${i.quantidade} × ${i.produto.nome}`
+        ? `${i.quantidade * 100}g × ${nome}`
+        : `${i.quantidade} × ${nome}`
       return i.observacao ? `${label} (${i.observacao})` : label
     })
     .join(' · ')
@@ -218,8 +220,8 @@ export default function Pedidos() {
     })
     setEditItens(p.itens.map((i) => ({
       produtoId:     i.produtoId,
-      nome:          i.produto.nome,
-      tipo:          i.produto.categoria?.tipo,
+      nome:          i.produto?.nome ?? '(produto removido)',
+      tipo:          i.produto?.categoria?.tipo,
       quantidade:    i.quantidade,
       precoUnitario: Number(i.precoUnitario),
       observacao:    i.observacao || '',
@@ -802,9 +804,10 @@ function gerarReciboTexto(p) {
   ]
 
   p.itens.forEach((item) => {
-    const isKilo = item.produto.categoria?.tipo === 'KILO'
+    const isKilo = item.produto?.categoria?.tipo === 'KILO'
     const qty = isKilo ? `${item.quantidade * 100}g` : `${item.quantidade}x`
-    const nome = item.produto.nome.substring(0, W - qty.length - fmt(item.totalItem).length - 3)
+    const nomeProd = item.produto?.nome ?? '(produto removido)'
+    const nome = nomeProd.substring(0, W - qty.length - fmt(item.totalItem).length - 3)
     const val = fmt(item.totalItem)
     const label = `${qty} ${nome}`
     const space = Math.max(1, W - label.length - val.length)
