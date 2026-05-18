@@ -15,7 +15,7 @@ const TIPO_CLS = {
 const SUBTIPO_LABEL = { UNIDADE: 'Unidade', PACOTE: 'Pacote' }
 const SUBTIPO_CLS   = { UNIDADE: 'bg-gray-100 text-gray-600', PACOTE: 'bg-indigo-100 text-indigo-700' }
 
-const INITIAL_CAT  = { nome: '', tipo: 'POTE', preco: '', precoKilo: '', descricao: '' }
+const INITIAL_CAT  = { nome: '', tipo: 'POTE', preco: '', precoKilo: '', descricao: '', emoji: '' }
 const INITIAL_PROD = { nome: '', ordem: 0, descricao: '', tamanho: '', subtipo: 'UNIDADE', preco: '' }
 
 function sortProdutos(a, b) {
@@ -94,7 +94,7 @@ export default function Cardapio() {
     setSaving(true)
     try {
       if (catModal.mode === 'add') {
-        const catPayload = { nome: formData.nome, tipo: formData.tipo, ordem: parseInt(formData.ordem) || 0, descricao: formData.descricao || null }
+        const catPayload = { nome: formData.nome, tipo: formData.tipo, emoji: formData.emoji || '', ordem: parseInt(formData.ordem) || 0, descricao: formData.descricao || null }
         if (formData.tipo === 'KILO' && formData.precoKilo) {
           catPayload.precoKilo = parseFloat(formData.precoKilo)
         }
@@ -109,7 +109,7 @@ export default function Cardapio() {
         setCats(cs => [...cs, newCat].sort(sortProdutos))
       } else {
         const tipo = catModal.data.tipo
-        const updatePayload = { nome: formData.nome, ordem: parseInt(formData.ordem) || 0, descricao: formData.descricao || null }
+        const updatePayload = { nome: formData.nome, emoji: formData.emoji || '', ordem: parseInt(formData.ordem) || 0, descricao: formData.descricao || null }
         if (tipo === 'KILO' && formData.precoKilo) {
           updatePayload.precoKilo = parseFloat(formData.precoKilo)
         }
@@ -120,18 +120,18 @@ export default function Cardapio() {
           ])
           setCats(cs => cs.map(c =>
             c.id === catModal.data.id
-              ? { ...c, nome: formData.nome, ordem: parseInt(formData.ordem) || 0, precosPorQuantidade: [{ quantidadeMinima: 1, preco: parseFloat(formData.preco) }] }
+              ? { ...c, nome: formData.nome, emoji: formData.emoji || '', ordem: parseInt(formData.ordem) || 0, precosPorQuantidade: [{ quantidadeMinima: 1, preco: parseFloat(formData.preco) }] }
               : c
           ).sort(sortProdutos))
         } else if (tipo === 'KILO') {
           setCats(cs => cs.map(c =>
             c.id === catModal.data.id
-              ? { ...c, nome: formData.nome, ordem: parseInt(formData.ordem) || 0, precoKilo: parseFloat(formData.precoKilo) || c.precoKilo }
+              ? { ...c, nome: formData.nome, emoji: formData.emoji || '', ordem: parseInt(formData.ordem) || 0, precoKilo: parseFloat(formData.precoKilo) || c.precoKilo }
               : c
           ).sort(sortProdutos))
         } else {
           setCats(cs => cs.map(c =>
-            c.id === catModal.data.id ? { ...c, nome: formData.nome, ordem: parseInt(formData.ordem) || 0 } : c
+            c.id === catModal.data.id ? { ...c, nome: formData.nome, emoji: formData.emoji || '', ordem: parseInt(formData.ordem) || 0 } : c
           ).sort(sortProdutos))
         }
       }
@@ -412,6 +412,7 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
   const [form, setForm] = useState({
     nome:      initial.nome      || '',
     tipo:      initial.tipo      || 'POTE',
+    emoji:     initial.emoji     || '',
     preco:     initial.precosPorQuantidade?.[0]?.preco ?? '',
     precoKilo: initial.precoKilo ?? '',
     ordem:     initial.ordem     ?? 0,
@@ -443,14 +444,25 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
       }
     >
       <div className="space-y-4">
-        <Field label="Nome">
-          <input
-            className="input"
-            value={form.nome}
-            onChange={e => set('nome', e.target.value)}
-            placeholder="Ex: Potes 300ml"
-          />
-        </Field>
+        <div className="grid grid-cols-[1fr_80px] gap-3">
+          <Field label="Nome">
+            <input
+              className="input"
+              value={form.nome}
+              onChange={e => set('nome', e.target.value)}
+              placeholder="Ex: Potes 300ml"
+            />
+          </Field>
+          <Field label="Ícone (emoji)">
+            <input
+              className="input text-center text-xl"
+              value={form.emoji}
+              onChange={e => set('emoji', e.target.value)}
+              placeholder="🍦"
+              maxLength={4}
+            />
+          </Field>
+        </div>
 
         {!isEdit && (
           <Field label="Tipo">
