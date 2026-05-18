@@ -4,10 +4,65 @@
 
 @layer components {
   .input {
-    @apply w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent;
+    @apply w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
+           dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 dark:placeholder-gray-400;
   }
 }
 
+/* ── Dark mode global overrides ─────────────────────────────── */
+html.dark { color-scheme: dark; }
+
+html.dark body                    { background-color: #111827; color: #f3f4f6; }
+
+/* Backgrounds */
+html.dark .bg-white               { background-color: #1f2937 !important; }
+html.dark .bg-gray-50             { background-color: #111827 !important; }
+html.dark .bg-gray-100            { background-color: #374151 !important; }
+html.dark .bg-gray-200            { background-color: #4b5563 !important; }
+
+/* Text */
+html.dark .text-gray-800,
+html.dark .text-gray-700          { color: #e5e7eb !important; }
+html.dark .text-gray-600,
+html.dark .text-gray-500          { color: #9ca3af !important; }
+html.dark .text-gray-400,
+html.dark .text-gray-300          { color: #6b7280 !important; }
+
+/* Borders */
+html.dark .border-gray-100,
+html.dark .border-gray-200,
+html.dark .border-gray-300        { border-color: #374151 !important; }
+html.dark .divide-gray-100 > * + *,
+html.dark .divide-gray-200 > * + *,
+html.dark .divide-y > * + *       { border-color: #374151 !important; }
+
+/* Shadows */
+html.dark .shadow-sm              { box-shadow: 0 1px 3px rgba(0,0,0,.5) !important; }
+
+/* Inputs/selects/textareas nativos (fora do .input) */
+html.dark input:not([type=checkbox]):not([type=radio]):not([type=date]),
+html.dark select,
+html.dark textarea                {
+  background-color: #374151 !important;
+  color: #f3f4f6 !important;
+  border-color: #4b5563 !important;
+}
+html.dark input[type=date]        {
+  background-color: #374151 !important;
+  color: #f3f4f6 !important;
+  border-color: #4b5563 !important;
+  color-scheme: dark;
+}
+
+/* Hover states em botões de ação */
+html.dark .hover\:bg-gray-50:hover  { background-color: #374151 !important; }
+html.dark .hover\:bg-gray-100:hover { background-color: #4b5563 !important; }
+html.dark .hover\:bg-gray-200:hover { background-color: #6b7280 !important; }
+
+/* Accent checkbox */
+html.dark input[type=checkbox] { accent-color: #4a90d9; }
+
+/* ── Print ──────────────────────────────────────────────────── */
 @media print {
   body > #root { display: none !important; }
   #print-receipt-content { display: block !important; }
