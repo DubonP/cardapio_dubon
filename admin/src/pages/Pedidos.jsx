@@ -56,7 +56,10 @@ function gerarReciboHTML(pedido) {
       const label = isKilo
         ? `${item.quantidade * 100}g × ${item.produto.nome}`
         : `${item.quantidade} × ${item.produto.nome}`
-      return `<div class="row"><span>${label}</span><span>${fmt(item.totalItem)}</span></div>`
+      const obsHTML = isKilo && item.observacao
+        ? `<div style="font-size:11px;padding-left:4px;color:#444">↳ ${item.observacao}</div>`
+        : ''
+      return `<div class="row"><span>${label}</span><span>${fmt(item.totalItem)}</span></div>${obsHTML}`
     })
     .join('')
 
@@ -111,9 +114,10 @@ function resumoItens(itens) {
   return itens
     .map((i) => {
       const isKilo = i.produto.categoria?.tipo === 'KILO'
-      return isKilo
+      const label = isKilo
         ? `${i.quantidade * 100}g × ${i.produto.nome}`
         : `${i.quantidade} × ${i.produto.nome}`
+      return i.observacao ? `${label} (${i.observacao})` : label
     })
     .join(' · ')
 }
@@ -218,6 +222,7 @@ export default function Pedidos() {
       tipo:          i.produto.categoria?.tipo,
       quantidade:    i.quantidade,
       precoUnitario: Number(i.precoUnitario),
+      observacao:    i.observacao || '',
     })))
     setNewItem({ produtoId: '', qtd: 1, preco: '' })
     if (produtos.length === 0) {
@@ -235,6 +240,7 @@ export default function Pedidos() {
       tipo:          prod.categoria?.tipo,
       quantidade:    Math.max(1, parseInt(newItem.qtd) || 1),
       precoUnitario: parseFloat(newItem.preco) || 0,
+      observacao:    '',
     }])
     setNewItem({ produtoId: '', qtd: 1, preco: '' })
   }
@@ -253,6 +259,9 @@ export default function Pedidos() {
     const qtd = Math.max(1, parseInt(val) || 1)
     setEditItens((prev) => prev.map((item, i) => i === idx ? { ...item, quantidade: qtd } : item))
   }
+
+  const changeEditItemObs = (idx, val) =>
+    setEditItens((prev) => prev.map((item, i) => i === idx ? { ...item, observacao: val.slice(0, 300) } : item))
 
   const handleEdit = async () => {
     if (!editModal) return
@@ -278,6 +287,7 @@ export default function Pedidos() {
           produtoId:     i.produtoId,
           quantidade:    i.quantidade,
           precoUnitario: i.precoUnitario,
+          observacao:    i.observacao || null,
         })),
       })
       setPedidos((prev) => prev.map((p) => (p.id === data.id ? data : p)))
@@ -461,32 +471,44 @@ export default function Pedidos() {
               <label className="block text-xs font-medium text-gray-600 mb-2">Itens do pedido</label>
               <div className="space-y-1.5 mb-2">
                 {editItens.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
-                    <span className="flex-1 text-sm text-gray-700 truncate">
-                      {item.tipo === 'KILO' ? `${item.quantidade * 100}g` : `${item.quantidade}×`} {item.nome}
-                    </span>
-                    <div className="flex items-center gap-1 shrink-0">
+                  <div key={idx} className="bg-gray-50 rounded-lg px-3 py-2 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="flex-1 text-sm text-gray-700 truncate">
+                        {item.tipo === 'KILO' ? `${item.quantidade * 100}g` : `${item.quantidade}×`} {item.nome}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => changeEditItemQtd(idx, item.quantidade - 1)}
+                          disabled={item.quantidade <= 1}
+                          className="w-6 h-6 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm font-bold disabled:opacity-40 leading-none"
+                        >−</button>
+                        <span className="w-6 text-center text-sm font-medium">{item.quantidade}</span>
+                        <button
+                          type="button"
+                          onClick={() => changeEditItemQtd(idx, item.quantidade + 1)}
+                          className="w-6 h-6 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm font-bold leading-none"
+                        >+</button>
+                      </div>
+                      <span className="text-sm font-medium text-gray-700 w-20 text-right shrink-0">
+                        {fmt(item.quantidade * item.precoUnitario)}
+                      </span>
                       <button
                         type="button"
-                        onClick={() => changeEditItemQtd(idx, item.quantidade - 1)}
-                        disabled={item.quantidade <= 1}
-                        className="w-6 h-6 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm font-bold disabled:opacity-40 leading-none"
-                      >−</button>
-                      <span className="w-6 text-center text-sm font-medium">{item.quantidade}</span>
-                      <button
-                        type="button"
-                        onClick={() => changeEditItemQtd(idx, item.quantidade + 1)}
-                        className="w-6 h-6 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm font-bold leading-none"
-                      >+</button>
+                        onClick={() => removeEditItem(idx)}
+                        className="text-red-400 hover:text-red-600 text-xl leading-none shrink-0"
+                      >×</button>
                     </div>
-                    <span className="text-sm font-medium text-gray-700 w-20 text-right shrink-0">
-                      {fmt(item.quantidade * item.precoUnitario)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeEditItem(idx)}
-                      className="text-red-400 hover:text-red-600 text-xl leading-none shrink-0"
-                    >×</button>
+                    {item.tipo === 'KILO' && (
+                      <input
+                        type="text"
+                        maxLength={300}
+                        value={item.observacao}
+                        onChange={(e) => changeEditItemObs(idx, e.target.value)}
+                        placeholder="Observação (opcional)"
+                        className="w-full border border-gray-200 rounded px-2 py-1 text-xs text-gray-600 focus:outline-none focus:ring-1 focus:ring-brand bg-white"
+                      />
+                    )}
                   </div>
                 ))}
                 {editItens.length === 0 && (
@@ -787,6 +809,7 @@ function gerarReciboTexto(p) {
     const label = `${qty} ${nome}`
     const space = Math.max(1, W - label.length - val.length)
     lines.push(`${label}${' '.repeat(space)}${val}`)
+    if (isKilo && item.observacao) lines.push(`  Obs: ${item.observacao}`)
   })
 
   lines.push(dash)
