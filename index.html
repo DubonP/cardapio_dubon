@@ -1027,8 +1027,8 @@
     const isKilo = cat.tipoOriginal === 'kilo';
     const showObs = isKilo || isTaca;
 
-    // Sabores do sorvete por kg (para taças com temSabores)
-    const kiloFlavors = isTaca && cat.temSabores
+    // Sabores do sorvete por kg (para opções de taça com temSabores)
+    const kiloFlavors = isTaca && prod.temSabores
       ? cardapio.categorias.filter(c => c.tipoOriginal === 'kilo').flatMap(c => c.produtos).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
       : [];
 
@@ -1040,10 +1040,10 @@
       <div class="item-name">${prod.nome}${prod.tamanho ? ' <span style="font-size:15px;font-weight:500;color:var(--sub)">· ' + prod.tamanho + '</span>' : ''}</div>
       ${prod.descricao ? `<div class="item-desc">${prod.descricao}</div>` : ''}
       <div class="item-price">${fmt(precoUnit)}${unLabel ? ' <span style="font-size:14px;font-weight:500;color:var(--sub)">' + unLabel + '</span>' : ''}</div>
-      ${isTaca && cat.temSabores ? `
+      ${isTaca && prod.temSabores ? `
       <div class="taca-section">
         <div class="taca-section-label">Escolha os sabores</div>
-        <div class="taca-section-count" id="taca-count">0 / ${cat.maxSabores} selecionado${cat.maxSabores > 1 ? 's' : ''}</div>
+        <div class="taca-section-count" id="taca-count">0 / ${prod.maxSabores} selecionado${prod.maxSabores > 1 ? 's' : ''}</div>
         <div class="taca-flavors" id="taca-flavors">
           ${kiloFlavors.length > 0
             ? kiloFlavors.map(f => `<button class="taca-chip" data-nome="${f.nome.replace(/"/g, '&quot;')}">${f.nome}</button>`).join('')
@@ -1060,16 +1060,16 @@
     `;
 
     // Flavor chip handler (taças)
-    if (isTaca && cat.temSabores && kiloFlavors.length > 0) {
+    if (isTaca && prod.temSabores && kiloFlavors.length > 0) {
       const flavorsEl = document.getElementById('taca-flavors');
       const countEl   = document.getElementById('taca-count');
       const updateChips = () => {
         flavorsEl.querySelectorAll('.taca-chip').forEach(chip => {
           const selected = itemSheetFlavors.includes(chip.dataset.nome);
-          const maxed    = !selected && itemSheetFlavors.length >= cat.maxSabores;
+          const maxed    = !selected && itemSheetFlavors.length >= prod.maxSabores;
           chip.className = 'taca-chip' + (selected ? ' selected' : '') + (maxed ? ' maxed' : '');
         });
-        countEl.textContent = `${itemSheetFlavors.length} / ${cat.maxSabores} selecionado${cat.maxSabores > 1 ? 's' : ''}`;
+        countEl.textContent = `${itemSheetFlavors.length} / ${prod.maxSabores} selecionado${prod.maxSabores > 1 ? 's' : ''}`;
         renderItemFooter(precoUnit, unLabel);
       };
       flavorsEl.addEventListener('click', (e) => {
@@ -1078,7 +1078,7 @@
         const nome = chip.dataset.nome;
         if (itemSheetFlavors.includes(nome)) {
           itemSheetFlavors = itemSheetFlavors.filter(f => f !== nome);
-        } else if (itemSheetFlavors.length < cat.maxSabores) {
+        } else if (itemSheetFlavors.length < prod.maxSabores) {
           itemSheetFlavors.push(nome);
         }
         updateChips();
@@ -1104,7 +1104,8 @@
   function renderItemFooter(precoUnit, unLabel) {
     const total = itemSheetQty * precoUnit;
     const cat = itemSheetData?.cat;
-    const tacaNeedsFlavors = cat?.tipoOriginal === 'taca' && cat?.temSabores && itemSheetFlavors.length === 0;
+    const prod = itemSheetData?.prod;
+    const tacaNeedsFlavors = cat?.tipoOriginal === 'taca' && prod?.temSabores && itemSheetFlavors.length === 0;
     document.getElementById('item-sheet-footer').innerHTML = `
       <div class="stepper">
         <button class="stepper-btn" id="step-minus" ${itemSheetQty <= 1 ? 'disabled' : ''}>−</button>
@@ -1129,14 +1130,14 @@
       const preco = (prod.preco ? parseFloat(prod.preco) : null) || cat.preco_unico;
 
       // Validar sabores obrigatórios na taça
-      if (cat.tipoOriginal === 'taca' && cat.temSabores && itemSheetFlavors.length === 0) {
+      if (cat.tipoOriginal === 'taca' && prod.temSabores && itemSheetFlavors.length === 0) {
         alert('Selecione ao menos 1 sabor.');
         return;
       }
 
       // Montar observação: sabores + texto livre
       let noteFinal = itemSheetNote;
-      if (cat.tipoOriginal === 'taca' && cat.temSabores && itemSheetFlavors.length > 0) {
+      if (cat.tipoOriginal === 'taca' && prod.temSabores && itemSheetFlavors.length > 0) {
         const saborStr = 'Sabores: ' + itemSheetFlavors.join(', ');
         noteFinal = itemSheetNote ? saborStr + ' | ' + itemSheetNote : saborStr;
       }
