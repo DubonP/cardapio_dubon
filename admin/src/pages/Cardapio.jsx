@@ -151,9 +151,12 @@ export default function Cardapio() {
     setSaving(true)
     const ordem = parseInt(formData.ordem) || 0
     const isCasquinha = prodModal.catTipo === 'CASQUINHA'
+    const isTacaProd  = prodModal.catTipo === 'TACA'
     try {
       const extra = isCasquinha
         ? { subtipo: formData.subtipo, preco: parseFloat(formData.preco) || null }
+        : isTacaProd
+        ? { preco: parseFloat(formData.preco) || null }
         : { tamanho: formData.tamanho || null }
 
       if (prodModal.mode === 'add') {
@@ -372,7 +375,7 @@ function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleP
                   {prod.tamanho && !prod.subtipo && (
                     <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{prod.tamanho}</span>
                   )}
-                  {prod.preco != null && cat.tipo === 'CASQUINHA' && (
+                  {prod.preco != null && (cat.tipo === 'CASQUINHA' || cat.tipo === 'TACA') && (
                     <span className="text-xs text-gray-500">{fmt(prod.preco)}</span>
                   )}
                 </div>
@@ -389,7 +392,7 @@ function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleP
           ))}
           <div className="px-4 py-2">
             <button onClick={onAddProd} className="text-xs text-brand font-medium hover:underline">
-              + Adicionar sabor
+              {cat.tipo === 'TACA' ? '+ Adicionar opção' : cat.tipo === 'CASQUINHA' ? '+ Adicionar casquinha' : '+ Adicionar sabor'}
             </button>
           </div>
         </div>
@@ -426,7 +429,7 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
 
   const isEdit = mode === 'edit'
   const tipo = isEdit ? initial.tipo : form.tipo
-  const needsPrice = tipo === 'POTE' || tipo === 'BEBIDA' || tipo === 'TACA'
+  const needsPrice = tipo === 'POTE' || tipo === 'BEBIDA'
   const needsPrecoKilo = tipo === 'KILO'
   const isTaca = tipo === 'TACA'
 
@@ -572,6 +575,7 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
 // ── ProdFormModal ────────────────────────────────────────────────
 function ProdFormModal({ mode, catTipo, initial, onSave, onClose, saving }) {
   const isCasquinha = catTipo === 'CASQUINHA'
+  const isTaca      = catTipo === 'TACA'
   const [form, setForm] = useState({
     nome:      initial.nome      || '',
     ordem:     initial.ordem     ?? 0,
@@ -585,6 +589,8 @@ function ProdFormModal({ mode, catTipo, initial, onSave, onClose, saving }) {
 
   const titulo = isCasquinha
     ? (mode === 'edit' ? 'Editar casquinha' : 'Nova casquinha')
+    : isTaca
+    ? (mode === 'edit' ? 'Editar opção de taça' : 'Nova opção de taça')
     : (mode === 'edit' ? 'Editar sabor' : 'Novo sabor')
 
   return (
@@ -605,12 +611,12 @@ function ProdFormModal({ mode, catTipo, initial, onSave, onClose, saving }) {
       }
     >
       <div className="space-y-4">
-        <Field label={isCasquinha ? 'Nome da casquinha' : 'Nome do sabor'}>
+        <Field label={isCasquinha ? 'Nome da casquinha' : isTaca ? 'Nome da opção' : 'Nome do sabor'}>
           <input
             className="input"
             value={form.nome}
             onChange={e => set('nome', e.target.value)}
-            placeholder={isCasquinha ? 'Ex: Cascão Biju' : 'Ex: Chocolate'}
+            placeholder={isCasquinha ? 'Ex: Cascão Biju' : isTaca ? 'Ex: Taça Simples' : 'Ex: Chocolate'}
             autoFocus
           />
         </Field>
@@ -635,6 +641,18 @@ function ProdFormModal({ mode, catTipo, initial, onSave, onClose, saving }) {
               />
             </Field>
           </>
+        ) : isTaca ? (
+          <Field label="Preço (R$)">
+            <input
+              className="input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.preco}
+              onChange={e => set('preco', e.target.value)}
+              placeholder="0,00"
+            />
+          </Field>
         ) : (
           <Field label="Tamanho (opcional)">
             <input
