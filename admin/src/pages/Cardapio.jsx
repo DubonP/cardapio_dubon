@@ -4,18 +4,19 @@ import Modal from '../components/Modal'
 
 const fmt = (v) => 'R$ ' + Number(v).toFixed(2).replace('.', ',')
 
-const TIPO_LABEL = { POTE: 'Pote', PICOLE: 'Picolé', BEBIDA: 'Bebida', KILO: 'Kg', CASQUINHA: 'Casquinha' }
+const TIPO_LABEL = { POTE: 'Pote', PICOLE: 'Picolé', BEBIDA: 'Bebida', KILO: 'Kg', CASQUINHA: 'Casquinha', TACA: 'Taça' }
 const TIPO_CLS = {
   POTE:     'bg-blue-100 text-blue-700',
   PICOLE:   'bg-pink-100 text-pink-700',
   BEBIDA:   'bg-green-100 text-green-700',
   KILO:     'bg-orange-100 text-orange-700',
   CASQUINHA:'bg-amber-100 text-amber-700',
+  TACA:     'bg-purple-100 text-purple-700',
 }
 const SUBTIPO_LABEL = { UNIDADE: 'Unidade', PACOTE: 'Pacote' }
 const SUBTIPO_CLS   = { UNIDADE: 'bg-gray-100 text-gray-600', PACOTE: 'bg-indigo-100 text-indigo-700' }
 
-const INITIAL_CAT  = { nome: '', tipo: 'POTE', preco: '', precoKilo: '', descricao: '', emoji: '' }
+const INITIAL_CAT  = { nome: '', tipo: 'POTE', preco: '', precoKilo: '', descricao: '', emoji: '', temSabores: false, maxSabores: 1 }
 const INITIAL_PROD = { nome: '', ordem: 0, descricao: '', tamanho: '', subtipo: 'UNIDADE', preco: '' }
 
 function sortProdutos(a, b) {
@@ -94,7 +95,7 @@ export default function Cardapio() {
     setSaving(true)
     try {
       if (catModal.mode === 'add') {
-        const catPayload = { nome: formData.nome, tipo: formData.tipo, emoji: formData.emoji || '', ordem: parseInt(formData.ordem) || 0, descricao: formData.descricao || null }
+        const catPayload = { nome: formData.nome, tipo: formData.tipo, emoji: formData.emoji || '', ordem: parseInt(formData.ordem) || 0, descricao: formData.descricao || null, temSabores: !!formData.temSabores, maxSabores: formData.temSabores ? (parseInt(formData.maxSabores) || 1) : null }
         if (formData.tipo === 'KILO' && formData.precoKilo) {
           catPayload.precoKilo = parseFloat(formData.precoKilo)
         }
@@ -109,7 +110,7 @@ export default function Cardapio() {
         setCats(cs => [...cs, newCat].sort(sortProdutos))
       } else {
         const tipo = catModal.data.tipo
-        const updatePayload = { nome: formData.nome, emoji: formData.emoji || '', ordem: parseInt(formData.ordem) || 0, descricao: formData.descricao || null }
+        const updatePayload = { nome: formData.nome, emoji: formData.emoji || '', ordem: parseInt(formData.ordem) || 0, descricao: formData.descricao || null, temSabores: !!formData.temSabores, maxSabores: formData.temSabores ? (parseInt(formData.maxSabores) || 1) : null }
         if (tipo === 'KILO' && formData.precoKilo) {
           updatePayload.precoKilo = parseFloat(formData.precoKilo)
         }
@@ -131,7 +132,9 @@ export default function Cardapio() {
           ).sort(sortProdutos))
         } else {
           setCats(cs => cs.map(c =>
-            c.id === catModal.data.id ? { ...c, nome: formData.nome, emoji: formData.emoji || '', ordem: parseInt(formData.ordem) || 0 } : c
+            c.id === catModal.data.id
+              ? { ...c, nome: formData.nome, emoji: formData.emoji || '', ordem: parseInt(formData.ordem) || 0, temSabores: !!formData.temSabores, maxSabores: formData.temSabores ? (parseInt(formData.maxSabores) || 1) : null }
+              : c
           ).sort(sortProdutos))
         }
       }
@@ -410,19 +413,22 @@ function Toggle({ checked, onChange }) {
 // ── CatFormModal ─────────────────────────────────────────────────
 function CatFormModal({ mode, initial, onSave, onClose, saving }) {
   const [form, setForm] = useState({
-    nome:      initial.nome      || '',
-    tipo:      initial.tipo      || 'POTE',
-    emoji:     initial.emoji     || '',
-    preco:     initial.precosPorQuantidade?.[0]?.preco ?? '',
-    precoKilo: initial.precoKilo ?? '',
-    ordem:     initial.ordem     ?? 0,
-    descricao: initial.descricao || '',
+    nome:       initial.nome       || '',
+    tipo:       initial.tipo       || 'POTE',
+    emoji:      initial.emoji      || '',
+    preco:      initial.precosPorQuantidade?.[0]?.preco ?? '',
+    precoKilo:  initial.precoKilo  ?? '',
+    ordem:      initial.ordem      ?? 0,
+    descricao:  initial.descricao  || '',
+    temSabores: initial.temSabores ?? false,
+    maxSabores: initial.maxSabores ?? 1,
   })
 
   const isEdit = mode === 'edit'
   const tipo = isEdit ? initial.tipo : form.tipo
-  const needsPrice = tipo === 'POTE' || tipo === 'BEBIDA'
+  const needsPrice = tipo === 'POTE' || tipo === 'BEBIDA' || tipo === 'TACA'
   const needsPrecoKilo = tipo === 'KILO'
+  const isTaca = tipo === 'TACA'
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -472,6 +478,7 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
               <option value="BEBIDA">Bebida</option>
               <option value="KILO">Sorvete por Kg</option>
               <option value="CASQUINHA">Casquinha</option>
+              <option value="TACA">Taça</option>
             </select>
           </Field>
         )}
@@ -506,6 +513,35 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
 
         {!isEdit && tipo === 'PICOLE' && (
           <p className="text-xs text-gray-400">Os preços por quantidade serão configurados após criar a categoria.</p>
+        )}
+
+        {isTaca && (
+          <div className="space-y-3 border border-purple-200 dark:border-purple-900 rounded-lg p-3 bg-purple-50 dark:bg-purple-950/30">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.temSabores}
+                onChange={e => set('temSabores', e.target.checked)}
+                className="w-4 h-4 accent-brand rounded"
+              />
+              <div>
+                <div className="text-sm font-medium text-gray-700">Permite escolha de sabores</div>
+                <div className="text-xs text-gray-400">Sabores virão dos produtos do Sorvete por Kg</div>
+              </div>
+            </label>
+            {form.temSabores && (
+              <Field label="Quantidade máxima de sabores">
+                <input
+                  className="input"
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={form.maxSabores}
+                  onChange={e => set('maxSabores', parseInt(e.target.value) || 1)}
+                />
+              </Field>
+            )}
+          </div>
         )}
 
         <Field label="Descrição (opcional)">

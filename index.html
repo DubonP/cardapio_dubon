@@ -173,6 +173,20 @@
     }
     .item-row-price { font-size: 13px; font-weight: 700; color: var(--blue); margin-top: 5px; }
 
+    /* Taça flavor selector */
+    .taca-section { margin-top: 16px; }
+    .taca-section-label { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+    .taca-section-count { font-size: 12px; color: var(--sub); margin-bottom: 10px; }
+    .taca-flavors { display: flex; flex-wrap: wrap; gap: 8px; }
+    .taca-chip {
+      padding: 6px 14px; border-radius: 20px;
+      border: 1.5px solid var(--border); background: #fff; color: var(--ink);
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      transition: all 0.15s; font-family: inherit;
+    }
+    .taca-chip.selected { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .taca-chip.maxed:not(.selected) { opacity: 0.35; cursor: not-allowed; }
+
     /* + button */
     .add-btn-round {
       width: 34px; height: 34px; border-radius: 10px;
@@ -997,15 +1011,26 @@
   /* ─── Item detail sheet ─── */
   let itemSheetQty = 1;
   let itemSheetNote = '';
+  let itemSheetFlavors = [];
   let itemSheetData = null;
 
   function openItemSheet(cat, prod) {
     itemSheetQty = 1;
     itemSheetNote = '';
+    itemSheetFlavors = [];
     itemSheetData = { cat, prod };
 
     const precoUnit = (prod.preco ? parseFloat(prod.preco) : null) || cat.preco_unico;
     const unLabel = cat.tipoOriginal === 'kilo' ? '/kg' : '';
+
+    const isTaca = cat.tipoOriginal === 'taca';
+    const isKilo = cat.tipoOriginal === 'kilo';
+    const showObs = isKilo || isTaca;
+
+    // Sabores do sorvete por kg (para taças com temSabores)
+    const kiloFlavors = isTaca && cat.temSabores
+      ? cardapio.categorias.filter(c => c.tipoOriginal === 'kilo').flatMap(c => c.produtos).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+      : [];
 
     document.getElementById('item-sheet-body').innerHTML = `
       <div class="item-cat-badge">
@@ -1015,16 +1040,53 @@
       <div class="item-name">${prod.nome}${prod.tamanho ? ' <span style="font-size:15px;font-weight:500;color:var(--sub)">· ' + prod.tamanho + '</span>' : ''}</div>
       ${prod.descricao ? `<div class="item-desc">${prod.descricao}</div>` : ''}
       <div class="item-price">${fmt(precoUnit)}${unLabel ? ' <span style="font-size:14px;font-weight:500;color:var(--sub)">' + unLabel + '</span>' : ''}</div>
-      ${cat.tipoOriginal === 'kilo' ? `
-      <div class="obs-row">
+      ${isTaca && cat.temSabores ? `
+      <div class="taca-section">
+        <div class="taca-section-label">Escolha os sabores</div>
+        <div class="taca-section-count" id="taca-count">0 / ${cat.maxSabores} selecionado${cat.maxSabores > 1 ? 's' : ''}</div>
+        <div class="taca-flavors" id="taca-flavors">
+          ${kiloFlavors.length > 0
+            ? kiloFlavors.map(f => `<button class="taca-chip" data-nome="${f.nome.replace(/"/g, '&quot;')}">${f.nome}</button>`).join('')
+            : '<span style="font-size:13px;color:var(--sub)">Nenhum sabor disponível</span>'}
+        </div>
+      </div>` : ''}
+      ${showObs ? `
+      <div class="obs-row" style="margin-top:16px">
         <span class="obs-label">Observação</span>
         <span class="obs-count" id="obs-count">Opcional · 0/300</span>
       </div>
-      <textarea class="obs-input" id="obs-input" rows="2" placeholder="Ex: sem castanhas, calda à parte…"></textarea>
+      <textarea class="obs-input" id="obs-input" rows="2" placeholder="${isTaca ? 'Ex: extra calda, sem cobertura…' : 'Ex: sem castanhas, calda à parte…'}"></textarea>
       ` : ''}
     `;
 
-    if (cat.tipoOriginal === 'kilo') {
+    // Flavor chip handler (taças)
+    if (isTaca && cat.temSabores && kiloFlavors.length > 0) {
+      const flavorsEl = document.getElementById('taca-flavors');
+      const countEl   = document.getElementById('taca-count');
+      const updateChips = () => {
+        flavorsEl.querySelectorAll('.taca-chip').forEach(chip => {
+          const selected = itemSheetFlavors.includes(chip.dataset.nome);
+          const maxed    = !selected && itemSheetFlavors.length >= cat.maxSabores;
+          chip.className = 'taca-chip' + (selected ? ' selected' : '') + (maxed ? ' maxed' : '');
+        });
+        countEl.textContent = `${itemSheetFlavors.length} / ${cat.maxSabores} selecionado${cat.maxSabores > 1 ? 's' : ''}`;
+        renderItemFooter(precoUnit, unLabel);
+      };
+      flavorsEl.addEventListener('click', (e) => {
+        const chip = e.target.closest('.taca-chip');
+        if (!chip) return;
+        const nome = chip.dataset.nome;
+        if (itemSheetFlavors.includes(nome)) {
+          itemSheetFlavors = itemSheetFlavors.filter(f => f !== nome);
+        } else if (itemSheetFlavors.length < cat.maxSabores) {
+          itemSheetFlavors.push(nome);
+        }
+        updateChips();
+      });
+    }
+
+    // Observação handler
+    if (showObs) {
       const textarea = document.getElementById('obs-input');
       textarea.addEventListener('input', () => {
         itemSheetNote = textarea.value.slice(0, 300);
@@ -1041,14 +1103,16 @@
 
   function renderItemFooter(precoUnit, unLabel) {
     const total = itemSheetQty * precoUnit;
+    const cat = itemSheetData?.cat;
+    const tacaNeedsFlavors = cat?.tipoOriginal === 'taca' && cat?.temSabores && itemSheetFlavors.length === 0;
     document.getElementById('item-sheet-footer').innerHTML = `
       <div class="stepper">
         <button class="stepper-btn" id="step-minus" ${itemSheetQty <= 1 ? 'disabled' : ''}>−</button>
         <span class="stepper-val">${itemSheetQty}</span>
         <button class="stepper-btn" id="step-plus">+</button>
       </div>
-      <button class="item-cta" id="item-cta-btn">
-        <span>Adicionar</span>
+      <button class="item-cta" id="item-cta-btn" ${tacaNeedsFlavors ? 'disabled style="opacity:0.5"' : ''}>
+        <span>${tacaNeedsFlavors ? 'Escolha os sabores' : 'Adicionar'}</span>
         <span>${fmt(total)}</span>
       </button>
     `;
@@ -1063,6 +1127,20 @@
       if (!itemSheetData) return;
       const { cat, prod } = itemSheetData;
       const preco = (prod.preco ? parseFloat(prod.preco) : null) || cat.preco_unico;
+
+      // Validar sabores obrigatórios na taça
+      if (cat.tipoOriginal === 'taca' && cat.temSabores && itemSheetFlavors.length === 0) {
+        alert('Selecione ao menos 1 sabor.');
+        return;
+      }
+
+      // Montar observação: sabores + texto livre
+      let noteFinal = itemSheetNote;
+      if (cat.tipoOriginal === 'taca' && cat.temSabores && itemSheetFlavors.length > 0) {
+        const saborStr = 'Sabores: ' + itemSheetFlavors.join(', ');
+        noteFinal = itemSheetNote ? saborStr + ' | ' + itemSheetNote : saborStr;
+      }
+
       cart.push({
         id: nextId++,
         categoria: cat.nome,
@@ -1073,7 +1151,7 @@
         qty: itemSheetQty,
         preco,
         total: preco * itemSheetQty,
-        note: itemSheetNote,
+        note: noteFinal,
       });
       updateCartUI();
       closeItemSheet();
