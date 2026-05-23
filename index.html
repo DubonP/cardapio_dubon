@@ -372,7 +372,7 @@
     #item-sheet { z-index: 70; }
     #item-backdrop { z-index: 65; }
     .item-hero {
-      height: 130px; background: var(--yellow-soft);
+      height: 54px; background: transparent;
       position: relative; flex-shrink: 0;
     }
     .item-hero-handle {
@@ -614,13 +614,14 @@
       }
       #dt-nav-search input::placeholder { color: var(--sub); }
       .dt-nav-btn {
-        width: 100%; display: flex; align-items: center; justify-content: space-between;
+        width: 100%; display: flex; align-items: flex-start; justify-content: space-between;
         padding: 9px 12px; border: none; border-radius: 10px;
-        background: transparent; font-size: 13.5px; font-weight: 500;
+        background: transparent; font-size: 13px; font-weight: 500;
         color: var(--ink); cursor: pointer; font-family: inherit;
         text-align: left; position: relative; margin-bottom: 2px;
         transition: background 0.12s;
       }
+      .nav-name { flex: 1; min-width: 0; line-height: 1.35; }
       .dt-nav-btn:hover { background: #F4F4F0; }
       .dt-nav-btn.active {
         background: var(--yellow-soft); font-weight: 700;
@@ -841,7 +842,7 @@
           <label>Forma de pagamento</label>
           <div class="toggle-group">
             <button class="toggle-btn" data-method="dinheiro" type="button">💵 Dinheiro</button>
-            <button class="toggle-btn" data-method="maquina" type="button">💳 Cartão/QRcode</button>
+            <button class="toggle-btn" data-method="maquina" type="button">💳 Cartão</button>
             <button class="toggle-btn" data-method="pix" type="button">📱 Pix</button>
           </div>
           <div id="troco-wrap" style="display:none">
