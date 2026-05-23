@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#24348B" />
   <title>Sorveteria Dubon — Cardápio | Monte Azul Paulista, SP</title>
   <meta name="description" content="Cardápio online da Sorveteria Dubon, em Monte Azul Paulista-SP. Sorvete artesanal desde 1991. Potes, picolés, milk-shake e muito mais. Peça pelo WhatsApp!" />
   <meta name="keywords" content="sorveteria, sorvete artesanal, Monte Azul Paulista, picolé, milk-shake, Dubon, cardápio" />
@@ -19,8 +20,53 @@
   <meta property="og:description" content="Sorvete artesanal desde 1991 em Monte Azul Paulista-SP. Confira nosso cardápio e peça pelo WhatsApp!" />
   <meta property="og:image" content="https://sorveteriadubon.com.br/assets/Logo.png" />
   <meta property="og:locale" content="pt_BR" />
+  <meta property="og:site_name" content="Sorveteria Dubon" />
+  <meta name="geo.region" content="BR-SP" />
+  <meta name="geo.placename" content="Monte Azul Paulista, SP" />
+  <meta name="geo.position" content="-20.9170;-48.3371" />
+  <meta name="ICBM" content="-20.9170, -48.3371" />
   <script type="application/ld+json">
-  {"@context":"https://schema.org","@type":"IceCreamShop","name":"Sorveteria Dubon","description":"Sorvete artesanal desde 1991","url":"https://sorveteriadubon.com.br","telephone":"+551733612425","address":{"@type":"PostalAddress","streetAddress":"Praça Rio Branco, 213","addressLocality":"Monte Azul Paulista","addressRegion":"SP","postalCode":"14730-000","addressCountry":"BR"},"sameAs":["https://www.instagram.com/dubonsorvetes/"]}
+  {
+    "@context": "https://schema.org",
+    "@type": "IceCreamShop",
+    "name": "Sorveteria Dubon",
+    "description": "Sorvete artesanal desde 1991 em Monte Azul Paulista, SP. Potes, picolés, sorvete por quilo, taças e muito mais.",
+    "url": "https://sorveteriadubon.com.br",
+    "telephone": "+551733612425",
+    "image": "https://sorveteriadubon.com.br/assets/Logo.png",
+    "priceRange": "$$",
+    "servesCuisine": ["Sorvete Artesanal", "Picolé", "Sorvete por Quilo"],
+    "currenciesAccepted": "BRL",
+    "paymentAccepted": "Dinheiro, Pix, Cartão de Crédito, Cartão de Débito",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Praça Rio Branco, 213",
+      "addressLocality": "Monte Azul Paulista",
+      "addressRegion": "SP",
+      "postalCode": "14730-000",
+      "addressCountry": "BR"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": -20.9170,
+      "longitude": -48.3371
+    },
+    "openingHoursSpecification": [
+      {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": "Monday",
+        "opens": "12:00",
+        "closes": "18:00"
+      },
+      {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+        "opens": "12:00",
+        "closes": "22:00"
+      }
+    ],
+    "sameAs": ["https://www.instagram.com/dubonsorvetes/"]
+  }
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -36,6 +82,12 @@
       --ink:         #1A1F36;
       --sub:         #6B7180;
       --border:      #ECECE8;
+    }
+
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0,0,0,0); white-space: nowrap; border: 0;
     }
 
     html, body {
@@ -721,6 +773,7 @@
 <div id="cat-tabs"><div class="cat-tabs-inner" id="cat-tabs-inner"></div></div>
 
 <!-- Menu -->
+<h1 class="visually-hidden">Sorveteria Dubon — Cardápio de Sorvetes em Monte Azul Paulista, SP</h1>
 <main id="menu"></main>
 
 <!-- Footer -->
