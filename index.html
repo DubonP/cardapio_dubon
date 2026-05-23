@@ -497,11 +497,13 @@
     .cart-form-wrap input:focus { border-color: var(--blue); }
     .toggle-group { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
     .toggle-btn {
-      flex: 1; min-width: 80px; padding: 9px 6px; border-radius: 10px;
+      flex: 1; min-width: 72px; padding: 10px 6px; border-radius: 10px;
       border: 1.5px solid var(--border); background: #F4F4F0;
-      color: var(--sub); font-size: 13px; font-weight: 600;
+      color: var(--sub); font-size: 12px; font-weight: 600;
       cursor: pointer; font-family: inherit; transition: all 0.15s; text-align: center;
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
     }
+    .toggle-btn .t-icon { font-size: 20px; line-height: 1; }
     .toggle-btn.active { border-color: var(--blue); background: var(--blue); color: #fff; }
     .notice-min {
       background: var(--yellow-soft); color: var(--ink); border-radius: 10px;
@@ -841,9 +843,9 @@
         <div id="forma-pagamento">
           <label>Forma de pagamento</label>
           <div class="toggle-group">
-            <button class="toggle-btn" data-method="dinheiro" type="button">💵 Dinheiro</button>
-            <button class="toggle-btn" data-method="maquina" type="button">💳 Cartão</button>
-            <button class="toggle-btn" data-method="pix" type="button">📱 Pix</button>
+            <button class="toggle-btn" data-method="dinheiro" type="button"><span class="t-icon">💵</span>Dinheiro</button>
+            <button class="toggle-btn" data-method="maquina" type="button"><span class="t-icon">💳</span>Maquininha</button>
+            <button class="toggle-btn" data-method="pix" type="button"><span class="t-icon">📱</span>Pix</button>
           </div>
           <div id="troco-wrap" style="display:none">
             <div class="toggle-group" style="margin-top:8px">
