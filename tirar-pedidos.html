@@ -1267,13 +1267,13 @@
                 btnMinus.addEventListener("click", () => {
                   if (kiloQty[idx][prod.nome] > 0) {
                     kiloQty[idx][prod.nome]--;
-                    valEl.textContent = (kiloQty[idx][prod.nome] * 100) + "g";
+                    valEl.textContent = (kiloQty[idx][prod.nome] * 50) + "g";
                     updateKiloSummary(idx, cat);
                   }
                 });
                 btnPlus.addEventListener("click", () => {
                   kiloQty[idx][prod.nome]++;
-                  valEl.textContent = (kiloQty[idx][prod.nome] * 100) + "g";
+                  valEl.textContent = (kiloQty[idx][prod.nome] * 50) + "g";
                   updateKiloSummary(idx, cat);
                 });
               }
@@ -1330,8 +1330,8 @@
           const el = kiloSummaryEls[idx];
           if (!el) return;
           const totalUnits = somaQty(kiloQty[idx]);
-          const totalGramas = totalUnits * 100;
-          const total = totalUnits * (cat.precoKilo / 10);
+          const totalGramas = totalUnits * 50;
+          const total = totalUnits * (cat.precoKilo / 20);
           el.innerHTML = `<span>Total: <strong>${totalGramas}g</strong></span><span class="summary-total">${fmt(total)}</span>`;
         }
 
@@ -1345,16 +1345,16 @@
           const qtyMap = kiloQty[catIdx];
           const total = somaQty(qtyMap);
           if (total === 0) {
-            alert("Selecione ao menos 100g antes de adicionar.");
+            alert("Selecione ao menos 50g antes de adicionar.");
             return;
           }
           const flavors = Object.entries(qtyMap)
             .filter(([, q]) => q > 0)
             .map(([nome, quantidade]) => ({ produtoId: kiloIdMap[catIdx][nome], nome, quantidade }));
           const saborLabel = flavors
-            .map(f => `${f.nome} ${f.quantidade * 100}g`)
+            .map(f => `${f.nome} ${f.quantidade * 50}g`)
             .join(", ");
-          const preco = cat.precoKilo / 10; // price per 100g unit
+          const preco = cat.precoKilo / 20; // price per 50g unit
           const totalPreco = Number((total * preco).toFixed(2));
           cart.push({
             id: nextId++,
@@ -1415,7 +1415,7 @@
               item.tipo === "pote"
                 ? `1 un × ${fmt(item.preco)}`
                 : item.tipo === "kilo"
-                ? `${item.qty * 100}g`
+                ? `${item.qty * 50}g`
                 : `${item.qty} un × ${fmt(item.preco)}`;
             div.innerHTML = `
               <div class="cart-item-name">${item.categoria}</div>

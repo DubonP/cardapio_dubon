@@ -1015,7 +1015,7 @@
   let itemSheetData = null;
 
   function openItemSheet(cat, prod) {
-    itemSheetQty = 1;
+    itemSheetQty = cat.tipoOriginal === 'kilo' ? 50 : 1;
     itemSheetNote = '';
     itemSheetFlavors = [];
     itemSheetData = { cat, prod };
@@ -1055,7 +1055,7 @@
         <span class="obs-label">Observação</span>
         <span class="obs-count" id="obs-count">Opcional · 0/300</span>
       </div>
-      <textarea class="obs-input" id="obs-input" rows="2" placeholder="${isTaca ? 'Ex: extra calda, sem cobertura…' : 'Ex: sem castanhas, calda à parte…'}"></textarea>
+      <textarea class="obs-input" id="obs-input" rows="2" placeholder="${isTaca ? 'Ex: extra calda, sem cobertura…' : 'Ex: Cobertura de morango, granulado colorido e cereja…'}"></textarea>
       ` : ''}
     `;
 
@@ -1102,14 +1102,16 @@
   }
 
   function renderItemFooter(precoUnit, unLabel) {
-    const total = itemSheetQty * precoUnit;
+    const isKilo = itemSheetData?.cat?.tipoOriginal === 'kilo';
+    const total = isKilo ? precoUnit * (itemSheetQty / 1000) : itemSheetQty * precoUnit;
+    const qtyLabel = isKilo ? (itemSheetQty >= 1000 ? (itemSheetQty / 1000) + 'kg' : itemSheetQty + 'g') : itemSheetQty;
     const cat = itemSheetData?.cat;
     const prod = itemSheetData?.prod;
     const tacaNeedsFlavors = cat?.tipoOriginal === 'taca' && prod?.temSabores && itemSheetFlavors.length === 0;
     document.getElementById('item-sheet-footer').innerHTML = `
       <div class="stepper">
-        <button class="stepper-btn" id="step-minus" ${itemSheetQty <= 1 ? 'disabled' : ''}>−</button>
-        <span class="stepper-val">${itemSheetQty}</span>
+        <button class="stepper-btn" id="step-minus" ${isKilo ? (itemSheetQty <= 50 ? 'disabled' : '') : (itemSheetQty <= 1 ? 'disabled' : '')}>−</button>
+        <span class="stepper-val">${qtyLabel}</span>
         <button class="stepper-btn" id="step-plus">+</button>
       </div>
       <button class="item-cta" id="item-cta-btn" ${tacaNeedsFlavors ? 'disabled style="opacity:0.5"' : ''}>
@@ -1119,10 +1121,12 @@
     `;
 
     document.getElementById('step-minus').addEventListener('click', () => {
-      if (itemSheetQty > 1) { itemSheetQty--; renderItemFooter(precoUnit, unLabel); }
+      if (isKilo) { if (itemSheetQty > 50) { itemSheetQty -= 50; renderItemFooter(precoUnit, unLabel); } }
+      else { if (itemSheetQty > 1) { itemSheetQty--; renderItemFooter(precoUnit, unLabel); } }
     });
     document.getElementById('step-plus').addEventListener('click', () => {
-      itemSheetQty++; renderItemFooter(precoUnit, unLabel);
+      if (isKilo) { itemSheetQty += 50; } else { itemSheetQty++; }
+      renderItemFooter(precoUnit, unLabel);
     });
     document.getElementById('item-cta-btn').addEventListener('click', () => {
       if (!itemSheetData) return;
@@ -1146,12 +1150,12 @@
         id: nextId++,
         categoria: cat.nome,
         emoji: cat.emoji,
-        tipo: 'pote',
+        tipo: cat.tipoOriginal === 'kilo' ? 'kilo' : 'pote',
         saborLabel: prod.nome,
         produtoId: prod.id,
         qty: itemSheetQty,
         preco,
-        total: preco * itemSheetQty,
+        total: cat.tipoOriginal === 'kilo' ? preco * (itemSheetQty / 1000) : preco * itemSheetQty,
         note: noteFinal,
       });
       updateCartUI();
@@ -1563,9 +1567,11 @@
     /* Refresh + buttons */
     document.querySelectorAll('.add-btn-round[data-prod-id]').forEach((btn) => {
       const prodId = Number(btn.dataset.prodId);
-      const q = cart.filter((i) => i.produtoId === prodId).reduce((s, i) => s + i.qty, 0);
+      const items = cart.filter((i) => i.produtoId === prodId);
+      const q = items.reduce((s, i) => s + i.qty, 0);
+      const isKiloBtn = items.some(i => i.tipo === 'kilo');
       btn.className = 'add-btn-round' + (q > 0 ? ' has-qty' : '');
-      btn.innerHTML = q > 0 ? String(q) : '+';
+      btn.innerHTML = q > 0 ? (isKiloBtn ? q + 'g' : String(q)) : '+';
     });
 
     /* Cart items */
@@ -1597,15 +1603,16 @@
         ? `${item.qty > 1 ? item.qty + ' × ' : ''}${fmt(item.preco)}`
         : `${item.qty} un × ${fmt(item.preco)}`;
 
+      const qtyDisplay = item.tipo === 'kilo' ? item.qty + 'g' : item.qty;
       div.innerHTML = `
-        <div class="cart-item-badge">${item.qty}×</div>
+        <div class="cart-item-badge">${item.tipo === 'kilo' ? item.qty + 'g' : item.qty + '×'}</div>
         <div class="cart-item-info">
           <div class="cart-item-name">${item.saborLabel}</div>
           <div class="cart-item-detail">${item.categoria} · ${fmt(item.total)}</div>
         </div>
         <div class="cart-item-ctrl">
           <button class="cart-ctrl-btn" data-action="dec" data-id="${item.id}">−</button>
-          <span class="cart-ctrl-val">${item.qty}</span>
+          <span class="cart-ctrl-val">${qtyDisplay}</span>
           <button class="cart-ctrl-btn inc" data-action="inc" data-id="${item.id}">+</button>
         </div>
       `;
@@ -1618,12 +1625,18 @@
         const item = cart.find((i) => i.id === id);
         if (!item) return;
         if (btn.dataset.action === 'inc') {
-          item.qty++;
-          item.total = item.preco * item.qty;
+          if (item.tipo === 'kilo') { item.qty += 50; item.total = item.preco * (item.qty / 1000); }
+          else { item.qty++; item.total = item.preco * item.qty; }
         } else {
-          item.qty--;
-          if (item.qty <= 0) { cart = cart.filter((i) => i.id !== id); }
-          else { item.total = item.preco * item.qty; }
+          if (item.tipo === 'kilo') {
+            item.qty -= 50;
+            if (item.qty <= 0) { cart = cart.filter((i) => i.id !== id); }
+            else { item.total = item.preco * (item.qty / 1000); }
+          } else {
+            item.qty--;
+            if (item.qty <= 0) { cart = cart.filter((i) => i.id !== id); }
+            else { item.total = item.preco * item.qty; }
+          }
         }
         recalcularCarrinhoPicole();
         updateAllPicoleSummaries();
@@ -1735,7 +1748,9 @@
     let msg = `Olá Dubon! Meu pedido:\n\n👤 Nome: ${nome}\n\n`;
     cart.forEach((item) => {
       grandTotal += item.total;
-      const unLabel = item.tipo === 'pote'
+      const unLabel = item.tipo === 'kilo'
+        ? `${item.qty}g · ${fmt(item.total)}`
+        : item.tipo === 'pote'
         ? `${item.qty > 1 ? item.qty + ' × ' : ''}${fmt(item.preco)} = ${fmt(item.total)}`
         : `${item.qty} un × ${fmt(item.preco)} = ${fmt(item.total)}`;
       msg += `${item.emoji || ''} *${item.categoria} — ${unLabel}*\n`;
