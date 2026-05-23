@@ -74,6 +74,13 @@ function gerarReciboHTML(pedido) {
 
   const pagLabel = { DINHEIRO: 'Dinheiro', MAQUINA: 'Cartão/QR', PIX: 'Pix' }
 
+  const parcial = Number(pedido.pagamentoParcial || 0)
+  const parcialHTML = parcial > 0
+    ? `<div class="div"></div>
+       <div class="row"><span>Pago (parcial)</span><span>${fmt(parcial)}</span></div>
+       <div class="row bold"><span>RESTANTE</span><span>${fmt(Math.max(0, Number(pedido.total) - parcial))}</span></div>`
+    : ''
+
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -87,12 +94,14 @@ body{font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:bold
 </style></head><body>
 <div class="center bold" style="font-size:15px">SORVETERIA DUBON</div>
 <div class="center bold">Pedido #${pedido.numeroDia}</div>
+${pedido.clienteNome ? `<div class="center bold">Cliente: ${pedido.clienteNome}</div>` : ''}
 <div class="center">${dt}</div>
 <div class="div"></div>
 ${itensHTML}
 <div class="div"></div>
 ${Number(pedido.taxaEntrega) > 0 ? `<div class="row"><span>Taxa entrega</span><span>${fmt(pedido.taxaEntrega)}</span></div>` : ''}
 <div class="row bold"><span>TOTAL</span><span>${fmt(pedido.total)}</span></div>
+${parcialHTML}
 <div class="div"></div>
 ${enderecoHTML}
 <div class="div"></div>
@@ -136,7 +145,7 @@ export default function Pedidos() {
   const [editSaving, setEditSaving] = useState(false)
   const [produtos, setProdutos] = useState([])
   const [newItem, setNewItem] = useState({ produtoId: '', qtd: 1, preco: '' })
-  const prevOrderIds = useRef(null)  // null = primeira carga (sem notificação)
+  const prevOrderIds = useRef(null)
 
   const fetchPedidos = useCallback(async () => {
     try {
@@ -145,7 +154,6 @@ export default function Pedidos() {
       const { data } = await api.get('/api/admin/pedidos', { params })
       setPedidos(data)
 
-      // Detecta pedidos novos (ignora primeira carga)
       if (prevOrderIds.current !== null) {
         const novos = data.filter((p) => !prevOrderIds.current.has(p.id))
         if (novos.length > 0) {
@@ -190,6 +198,16 @@ export default function Pedidos() {
       await api.patch(`/api/admin/pedidos/${id}/status`, { status })
     } catch {
       setPedidos((prev) => prev.map((p) => (p.id === id ? { ...p, status: anterior } : p)))
+    }
+  }
+
+  const handlePagamentoParcial = async (id, valor) => {
+    const anterior = pedidos.find((p) => p.id === id)?.pagamentoParcial
+    setPedidos((prev) => prev.map((p) => (p.id === id ? { ...p, pagamentoParcial: valor } : p)))
+    try {
+      await api.patch(`/api/admin/pedidos/${id}/flags`, { pagamentoParcial: valor === 0 ? null : valor })
+    } catch {
+      setPedidos((prev) => prev.map((p) => (p.id === id ? { ...p, pagamentoParcial: anterior } : p)))
     }
   }
 
@@ -270,7 +288,6 @@ export default function Pedidos() {
     if (editItens.length === 0) { alert('O pedido deve ter ao menos 1 item'); return }
     setEditSaving(true)
     try {
-      // 1. Salva dados do pedido (incluindo taxaEntrega)
       await api.patch(`/api/admin/pedidos/${editModal.id}`, {
         clienteNome:     editForm.clienteNome     || undefined,
         whatsappCliente: editForm.whatsappCliente || null,
@@ -283,7 +300,6 @@ export default function Pedidos() {
         trocoPara:       editForm.trocoPara !== '' ? parseFloat(editForm.trocoPara) : null,
         taxaEntrega:     parseFloat(editForm.taxaEntrega),
       })
-      // 2. Salva itens e recalcula subtotal/total com a nova taxaEntrega
       const { data } = await api.put(`/api/admin/pedidos/${editModal.id}/itens`, {
         itens: editItens.map((i) => ({
           produtoId:     i.produtoId,
@@ -358,6 +374,7 @@ export default function Pedidos() {
               pedido={p}
               onFlag={handleFlag}
               onStatus={handleStatus}
+              onPagamentoParcial={handlePagamentoParcial}
               onMsg={handleMsg}
               onPrint={() => setPrintModal(p)}
               onEdit={() => openEdit(p)}
@@ -651,18 +668,78 @@ export default function Pedidos() {
 }
 
 /* ── Card de pedido ── */
-function PedidoCard({ pedido: p, onFlag, onStatus, onMsg, onPrint, onEdit }) {
+function PedidoCard({ pedido: p, onFlag, onStatus, onPagamentoParcial, onMsg, onPrint, onEdit }) {
+  const [parcialOpen, setParcialOpen] = useState(false)
+  const [parcialInput, setParcialInput] = useState('')
+
   const statusInfo = STATUS[p.status] || STATUS.RECEBIDO
   const isEntrega = p.tipoEntrega === 'ENTREGA'
+  const isCanceled = p.status === 'CANCELADO'
+  const parcialVal = Number(p.pagamentoParcial || 0)
+  const restante = Math.max(0, Number(p.total) - parcialVal)
 
-  const cardBg = p.finalizado
-    ? 'bg-red-200 border-red-400'
-    : p.saiuEntrega
-      ? 'bg-green-200 border-green-400'
-      : 'bg-white border-gray-200'
+  // Priority: cancelado > finalizado > saiu > impresso > avisado > pago > default
+  const cardStyle = (() => {
+    if (isCanceled)    return { bg: 'bg-gray-200 border-gray-400', wm: 'CANCELADO', wmColor: '#374151' }
+    if (p.finalizado)  return { bg: 'bg-yellow-50 border-yellow-300', wm: 'FINALIZADO', wmColor: '#a16207' }
+    if (p.saiuEntrega) return { bg: 'bg-green-50 border-green-300', wm: 'SAIU', wmColor: '#15803d' }
+    if (p.impresso)    return { bg: 'bg-blue-50 border-blue-300', wm: 'IMPRESSO', wmColor: '#1d4ed8' }
+    if (p.avisado)     return { bg: 'bg-purple-50 border-purple-300', wm: 'AVISADO', wmColor: '#7e22ce' }
+    if (p.pago)        return { bg: 'bg-amber-50 border-amber-300', wm: 'PAGO', wmColor: '#b45309' }
+    return { bg: 'bg-white border-gray-200', wm: null }
+  })()
+
+  const handleCancelToggle = (e) => {
+    e.preventDefault()
+    if (isCanceled) {
+      if (window.confirm('Reativar este pedido?')) {
+        onStatus(p.id, 'RECEBIDO')
+      }
+    } else {
+      if (window.confirm('Cancelar este pedido? Esta ação é difícil de desfazer.')) {
+        onStatus(p.id, 'CANCELADO')
+      }
+    }
+  }
+
+  const confirmParcial = () => {
+    const val = parseFloat(parcialInput.replace(',', '.'))
+    if (isNaN(val) || val < 0) return
+    onPagamentoParcial(p.id, val)
+    setParcialOpen(false)
+    setParcialInput('')
+  }
 
   return (
-    <div className={`${cardBg} rounded-xl border shadow-sm overflow-hidden transition-colors`}>
+    <div
+      className={`${cardStyle.bg} rounded-xl border shadow-sm overflow-hidden transition-colors relative`}
+      style={isCanceled ? { filter: 'grayscale(0.6)' } : undefined}
+    >
+      {/* Marca d'água diagonal */}
+      {cardStyle.wm && (
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden"
+          aria-hidden="true"
+        >
+          <span
+            style={{
+              fontSize: '80px',
+              fontWeight: 900,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              color: cardStyle.wmColor,
+              opacity: 0.12,
+              transform: 'rotate(-30deg)',
+              whiteSpace: 'nowrap',
+              userSelect: 'none',
+              lineHeight: 1,
+            }}
+          >
+            {cardStyle.wm}
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between px-4 py-3 border-b border-gray-100">
         <div className="flex items-center gap-2 flex-wrap">
@@ -675,14 +752,18 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onMsg, onPrint, onEdit }) {
             {new Date(p.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
           </span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-col items-end gap-0.5 shrink-0">
           <span className="font-bold text-brand">{fmt(p.total)}</span>
+          {parcialVal > 0 && (
+            <span className="text-xs text-orange-600 font-medium">
+              Pago: {fmt(parcialVal)} · Restante: {fmt(restante)}
+            </span>
+          )}
         </div>
       </div>
 
       {/* Body */}
       <div className="px-4 py-3 space-y-2">
-        {/* Tipo + pagamento */}
         <div className="flex gap-3 text-sm flex-wrap">
           <span className={`font-medium ${isEntrega ? 'text-purple-700' : 'text-green-700'}`}>
             {isEntrega ? '🛵 Entrega' : '🏪 Retirada'}
@@ -692,11 +773,7 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onMsg, onPrint, onEdit }) {
             <span className="text-gray-500">Troco p/ {fmt(p.trocoPara)}</span>
           )}
         </div>
-
-        {/* Itens */}
         <p className="text-sm text-gray-600">{resumoItens(p.itens)}</p>
-
-        {/* Endereço */}
         {isEntrega && p.rua && (
           <p className="text-sm text-gray-500">
             📍 {p.rua}, {p.numero} — {p.bairro}
@@ -706,7 +783,7 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onMsg, onPrint, onEdit }) {
       </div>
 
       {/* Checkboxes */}
-      <div className="flex flex-wrap gap-x-4 gap-y-2 px-4 py-2 border-t border-gray-100 bg-gray-50">
+      <div className="flex flex-wrap gap-x-4 gap-y-2 px-4 py-2 border-t border-gray-100 bg-white/50">
         {[
           { key: 'pago',        label: 'Pago' },
           { key: 'avisado',     label: 'Avisado' },
@@ -725,16 +802,17 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onMsg, onPrint, onEdit }) {
           </label>
         ))}
 
-        {/* Status dropdown */}
-        <select
-          value={p.status}
-          onChange={(e) => onStatus(p.id, e.target.value)}
-          className="ml-auto text-xs border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand"
-        >
-          {Object.entries(STATUS).map(([k, v]) => (
-            <option key={k} value={k}>{v.label}</option>
-          ))}
-        </select>
+        {/* Cancelado — com confirmação */}
+        <label className="flex items-center gap-1.5 text-sm text-red-600 cursor-pointer select-none ml-auto">
+          <input
+            type="checkbox"
+            checked={isCanceled}
+            onChange={() => {}}
+            onClick={handleCancelToggle}
+            className="w-4 h-4 accent-red-600 rounded cursor-pointer"
+          />
+          Cancelado
+        </label>
       </div>
 
       {/* Ações */}
@@ -771,6 +849,50 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onMsg, onPrint, onEdit }) {
             🛵 Avisar entregador
           </button>
         )}
+
+        {/* Pagamento parcial */}
+        {parcialOpen ? (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-gray-500 font-medium">R$</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={parcialInput}
+              onChange={(e) => setParcialInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && confirmParcial()}
+              className="w-24 border border-orange-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+              placeholder="0,00"
+              autoFocus
+            />
+            <button
+              onClick={confirmParcial}
+              className="text-xs px-3 py-1.5 rounded-lg bg-orange-500 text-white hover:bg-orange-600 font-medium"
+            >
+              Confirmar
+            </button>
+            <button
+              onClick={() => { setParcialOpen(false); setParcialInput('') }}
+              className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium"
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => {
+              setParcialInput(parcialVal > 0 ? String(parcialVal) : '')
+              setParcialOpen(true)
+            }}
+            className={`text-xs px-3 py-1.5 rounded-lg font-medium ${
+              parcialVal > 0
+                ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
+            }`}
+          >
+            💲 {parcialVal > 0 ? `Parcial: ${fmt(parcialVal)}` : 'Pagamento parcial'}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -799,9 +921,10 @@ function gerarReciboTexto(p) {
     line,
     center('SORVETERIA DUBON'),
     center(`Pedido #${p.numeroDia}`),
-    center(dt),
-    line,
   ]
+  if (p.clienteNome) lines.push(center(`Cliente: ${p.clienteNome}`))
+  lines.push(center(dt))
+  lines.push(line)
 
   p.itens.forEach((item) => {
     const isKilo = item.produto?.categoria?.tipo === 'KILO'
@@ -818,6 +941,14 @@ function gerarReciboTexto(p) {
   lines.push(dash)
   if (Number(p.taxaEntrega) > 0) lines.push(rowLR('Taxa entrega:', fmt(p.taxaEntrega)))
   lines.push(rowLR('TOTAL:', fmt(p.total)))
+
+  const parcial = Number(p.pagamentoParcial || 0)
+  if (parcial > 0) {
+    lines.push(dash)
+    lines.push(rowLR('Pago (parcial):', fmt(parcial)))
+    lines.push(rowLR('RESTANTE:', fmt(Math.max(0, Number(p.total) - parcial))))
+  }
+
   lines.push(line)
 
   if (p.tipoEntrega === 'ENTREGA') {
