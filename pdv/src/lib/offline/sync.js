@@ -83,13 +83,13 @@ async function processarOperacao(op, ctx) {
 
     case 'finalizarComanda': {
       await api.patch(`/api/pdv/comandas/${comandaIdReal}/finalizar`, op.payload, { timeout: TIMEOUT_MS })
-      await db.removerComandaLocal(op.comandaId)
+      await db.removerComandaLocal(String(comandaIdReal))
       return
     }
 
     case 'cancelarComanda': {
       await api.patch(`/api/pdv/comandas/${comandaIdReal}/cancelar`, undefined, { timeout: TIMEOUT_MS })
-      await db.removerComandaLocal(op.comandaId)
+      await db.removerComandaLocal(String(comandaIdReal))
       return
     }
 

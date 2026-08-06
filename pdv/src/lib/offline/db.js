@@ -72,9 +72,26 @@ export async function contarPendentes() {
 
 // ─── Espelho local de comandas ─────────────────────────────────────────────
 
+// O backend serializa campos Decimal (valorUnitario, total, ...) como string
+// em JSON. Normaliza pra number aqui, no único ponto de escrita do espelho
+// local, pra nunca misturar string com number nas contas feitas no cliente
+// (ex: recalcularTotal, totalDoItem em operations.js).
+function normalizarComanda(comanda) {
+  return {
+    ...comanda,
+    total: Number(comanda.total),
+    itens: (comanda.itens || []).map((item) => ({
+      ...item,
+      quantidade: Number(item.quantidade),
+      valorUnitario: Number(item.valorUnitario),
+      valorTotal: Number(item.valorTotal),
+    })),
+  }
+}
+
 export async function salvarComandaLocal(comanda) {
   const db = await getDB()
-  await db.put('comandasLocal', comanda)
+  await db.put('comandasLocal', normalizarComanda(comanda))
 }
 
 export async function getComandaLocal(localId) {

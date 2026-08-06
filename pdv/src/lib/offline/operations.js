@@ -130,7 +130,7 @@ export async function adicionarItem(comandaId, item) {
     aoFalhar: async () => {
       const atual = await db.getComandaLocal(String(comandaId))
       if (!atual) throw new Error('Comanda offline não encontrada neste dispositivo')
-      const novoItem = { ...item, id: db.gerarIdTemporario() }
+      const novoItem = { ...item, id: db.gerarIdTemporario(), valorTotal: totalDoItem(item) }
       const itens = [...atual.itens, novoItem]
       const atualizada = { ...atual, itens, total: recalcularTotal(itens) }
       await db.salvarComandaLocal(atualizada)
