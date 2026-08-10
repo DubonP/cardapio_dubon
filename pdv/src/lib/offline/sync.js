@@ -115,8 +115,12 @@ async function processarOperacao(op, ctx) {
   }
 }
 
+function temToken() {
+  return !!localStorage.getItem('dubon_pdv_token')
+}
+
 export async function tentarSincronizar() {
-  if (processando || !isPrincipal() || !isOnline()) return
+  if (processando || !isPrincipal() || !isOnline() || !temToken()) return
   processando = true
   estado = { ...estado, rodando: true, erro: null, precisaLogin: false }
   emit()

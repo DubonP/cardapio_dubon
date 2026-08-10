@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
+import { tentarSincronizar } from '../lib/offline/sync'
 
 export default function Login() {
   const [senha, setSenha] = useState('')
@@ -15,6 +16,7 @@ export default function Login() {
     try {
       const { data } = await api.post('/api/pdv/auth/login', { senha })
       localStorage.setItem('dubon_pdv_token', data.token)
+      tentarSincronizar()
       navigate('/', { replace: true })
     } catch (err) {
       setErro(err.response?.data?.error || 'Erro ao conectar')
