@@ -51,8 +51,53 @@ export default function Debug() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-3">
+      <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-2">
         <p className="font-sans font-bold mb-2">Fila de operações pendentes ({fila.length})</p>
+        {Object.entries(
+          fila.reduce((grupos, op) => {
+            const chave = op.comandaId ?? 'caixa'
+            ;(grupos[chave] ||= []).push(op)
+            return grupos
+          }, {}),
+        ).map(([comandaId, ops]) => {
+          const temErro = ops.some((op) => op.status === 'erro')
+          return (
+            <div
+              key={comandaId}
+              className={`border rounded-lg p-2 space-y-1 font-sans ${temErro ? 'border-red-200 bg-red-50' : 'border-slate-200'}`}
+            >
+              <p className={temErro ? 'text-red-700' : 'text-slate-700'}>
+                <strong>Comanda {comandaId}</strong> — {ops.length} operaç{ops.length === 1 ? 'ão' : 'ões'} na fila
+              </p>
+              {ops.map((op) => (
+                <p key={op.id} className="text-xs text-slate-500 pl-2">
+                  {op.status === 'erro' ? '❌' : '⏳'} {op.tipo} {op.erro ? `— ${op.erro}` : ''}
+                </p>
+              ))}
+              {temErro && (
+                <>
+                  <p className="text-xs text-slate-500">
+                    Alguma operação dessa comanda foi recusada pelo servidor (não é falta de internet — ex: a
+                    comanda já foi encerrada por outro caminho). Isso trava só essa comanda; as outras sincronizam
+                    normalmente. Confira o estado real dela no admin antes de descartar; depois de descartado não
+                    tem volta.
+                  </p>
+                  <button
+                    onClick={async () => {
+                      if (!window.confirm(`Descartar TODAS as ${ops.length} operação(ões) pendentes da comanda ${comandaId}? Não pode ser desfeito.`)) return
+                      for (const op of ops) await db.removerDaFila(op.id)
+                      await carregar()
+                      tentarSincronizar()
+                    }}
+                    className="bg-red-600 text-white rounded-lg px-3 py-1 text-xs"
+                  >
+                    Descartar todas as pendências desta comanda
+                  </button>
+                </>
+              )}
+            </div>
+          )
+        })}
         <pre className="overflow-x-auto text-xs bg-slate-50 p-2 rounded-lg">{JSON.stringify(fila, null, 2)}</pre>
       </div>
 

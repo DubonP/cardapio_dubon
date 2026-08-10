@@ -1,9 +1,11 @@
 import api from '../api'
 
-const PING_INTERVAL_MS = 15000
+const PING_INTERVAL_MS = 30000
+const PING_TIMEOUT_MS = 4000
 
 let online = navigator.onLine
 let pingTimer = null
+let pingEmAndamento = false
 const listeners = new Set()
 
 function emit() {
@@ -17,11 +19,16 @@ function setOnline(value) {
 }
 
 async function ping() {
+  // evita empilhar pings simultâneos quando a rede está lenta/instável (não totalmente caída)
+  if (pingEmAndamento) return
+  pingEmAndamento = true
   try {
-    await api.get('/api/cardapio', { timeout: 5000 })
+    await api.get('/api/cardapio', { timeout: PING_TIMEOUT_MS })
     setOnline(true)
   } catch {
     setOnline(false)
+  } finally {
+    pingEmAndamento = false
   }
 }
 

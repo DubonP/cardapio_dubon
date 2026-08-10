@@ -1,6 +1,7 @@
 import api from '../api'
 import * as db from './db'
 import { isPrincipal } from './role'
+import { isOnline } from './connectivity'
 
 const TIMEOUT_MS = 8000
 
@@ -9,7 +10,10 @@ function erroDeRede(err) {
 }
 
 // Leitura: qualquer dispositivo pode cair pro espelho local quando offline.
+// Se já sabemos que está offline (connectivity.js), nem tenta rede — evita
+// ficar esperando o timeout em cada refresh automático (comandas, caixa, ...).
 async function comLeituraOffline({ tentar, aoFalhar }) {
+  if (!isOnline()) return aoFalhar()
   try {
     return await tentar()
   } catch (err) {
@@ -21,6 +25,10 @@ async function comLeituraOffline({ tentar, aoFalhar }) {
 // Escrita: só o dispositivo "principal" enfileira e segue otimista;
 // nos demais, o erro de rede sobe normalmente (a UI bloqueia antes disso, ver Fase 6).
 async function comEscritaOffline({ tentar, aoFalhar }) {
+  if (!isOnline()) {
+    if (!isPrincipal()) throw new Error('Sem conexão')
+    return aoFalhar()
+  }
   try {
     return await tentar()
   } catch (err) {

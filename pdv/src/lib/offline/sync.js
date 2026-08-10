@@ -119,33 +119,64 @@ function temToken() {
   return !!localStorage.getItem('dubon_pdv_token')
 }
 
+// Agrupa a fila por comanda (chave '__caixa__' pras operações de caixa, que
+// não têm comandaId). Operações da MESMA comanda continuam estritamente em
+// ordem; um erro numa comanda não deve travar a sincronização das outras.
+function agruparPorComanda(fila) {
+  const grupos = new Map()
+  for (const op of fila) {
+    const chave = op.comandaId ?? '__caixa__'
+    if (!grupos.has(chave)) grupos.set(chave, [])
+    grupos.get(chave).push(op)
+  }
+  return grupos
+}
+
 export async function tentarSincronizar() {
   if (processando || !isPrincipal() || !isOnline() || !temToken()) return
   processando = true
   estado = { ...estado, rodando: true, erro: null, precisaLogin: false }
   emit()
 
-  const ctx = { mapaComandas: new Map(), mapaItens: new Map(), conhecidos: new Map() }
+  const errosPorGrupo = []
+  let semRede = false
+  let precisaLogin = false
 
   try {
     const fila = await db.listarFila()
-    for (const op of fila) {
-      try {
-        await processarOperacao(op, ctx)
-        await db.removerDaFila(op.id)
-      } catch (err) {
-        if (!err.response) {
-          // continua sem internet de verdade — tenta de novo na próxima reconexão
-          break
+    const grupos = agruparPorComanda(fila)
+
+    for (const opsDoGrupo of grupos.values()) {
+      if (semRede || precisaLogin) break // falha de rede/sessão é global, não faz sentido tentar as outras
+      const ctx = { mapaComandas: new Map(), mapaItens: new Map(), conhecidos: new Map() }
+      for (const op of opsDoGrupo) {
+        try {
+          await processarOperacao(op, ctx)
+          await db.removerDaFila(op.id)
+        } catch (err) {
+          if (!err.response) {
+            semRede = true
+            break
+          }
+          if (err.response.status === 401) {
+            precisaLogin = true
+            break
+          }
+          await db.marcarErroFila(op.id, err.response?.data?.error || err.message || 'Erro ao sincronizar')
+          errosPorGrupo.push(`${op.tipo} (${op.comandaId ?? 'caixa'}): ${err.response?.data?.error || err.message}`)
+          break // só para essa comanda — segue pras próximas
         }
-        if (err.response.status === 401) {
-          estado = { ...estado, erro: 'Sessão expirada — faça login novamente para sincronizar', precisaLogin: true }
-          break
-        }
-        await db.marcarErroFila(op.id, err.response?.data?.error || err.message || 'Erro ao sincronizar')
-        estado = { ...estado, erro: `Falha ao sincronizar (${op.tipo}): ${err.response?.data?.error || err.message}` }
-        break
       }
+    }
+
+    estado = {
+      ...estado,
+      erro: precisaLogin
+        ? 'Sessão expirada — faça login novamente para sincronizar'
+        : errosPorGrupo.length > 0
+          ? `${errosPorGrupo.length} pendência(s) com erro — veja a fila em /pdv/debug: ${errosPorGrupo.join(' · ')}`
+          : null,
+      precisaLogin,
     }
   } finally {
     processando = false
