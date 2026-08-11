@@ -1,12 +1,15 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import { isAdmin } from '../lib/auth'
 
 const NAV = [
-  { to: '/pedidos',      icon: '📋', label: 'Pedidos' },
-  { to: '/cardapio',     icon: '🍦', label: 'Cardápio' },
-  { to: '/entregadores', icon: '🛵', label: 'Entregadores' },
-  { to: '/configuracoes',icon: '⚙️', label: 'Config.' },
-  { to: '/relatorios',   icon: '📊', label: 'Relatórios' },
+  { to: '/pedidos',       icon: '📋', label: 'Pedidos',      adminOnly: false },
+  { to: '/cardapio',      icon: '🍦', label: 'Cardápio',     adminOnly: false },
+  { to: '/entregadores',  icon: '🛵', label: 'Entregadores', adminOnly: false },
+  { to: '/balcao',        icon: '🏪', label: 'Balcão',       adminOnly: true  },
+  { to: '/caixa',         icon: '💰', label: 'Caixa',        adminOnly: true  },
+  { to: '/configuracoes', icon: '⚙️', label: 'Config.',      adminOnly: true  },
+  { to: '/relatorios',    icon: '📊', label: 'Relatórios',   adminOnly: true  },
 ]
 
 function useDarkMode() {
@@ -42,9 +45,12 @@ function DarkToggle({ dark, toggle, className = '' }) {
 export default function Layout() {
   const navigate = useNavigate()
   const [dark, toggleDark] = useDarkMode()
+  const admin = isAdmin()
+  const visibleNav = NAV.filter(n => !n.adminOnly || admin)
 
   function logout() {
     localStorage.removeItem('dubon_token')
+    localStorage.removeItem('dubon_role')
     navigate('/login')
   }
 
@@ -61,7 +67,7 @@ export default function Layout() {
           <div className="text-xs text-blue-300 mt-0.5">Painel Administrativo</div>
         </div>
         <nav className="flex-1 p-3">
-          {NAV.map(({ to, icon, label }) => (
+          {visibleNav.map(({ to, icon, label }) => (
             <NavLink key={to} to={to} className={linkClass}>
               <span className="text-base">{icon}</span>
               <span>{label}</span>
@@ -110,7 +116,7 @@ export default function Layout() {
 
       {/* ── Nav inferior mobile/tablet ── */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex z-30 shadow-lg">
-        {NAV.map(({ to, icon, label }) => (
+        {visibleNav.map(({ to, icon, label }) => (
           <NavLink
             key={to}
             to={to}

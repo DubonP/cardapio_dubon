@@ -15,7 +15,7 @@ function horariosFromRaw(raw) {
 }
 
 export default function Configuracoes() {
-  const [form, setForm] = useState({ taxa_entrega: '', whatsapp_loja: '', pix_chave: '', pix_nome: '', pix_tipo: 'Celular' })
+  const [form, setForm] = useState({ taxa_entrega: '', whatsapp_loja: '', pix_chave: '', pix_nome: '', pix_tipo: 'Celular', pdv_senha: '', funcionario_senha: '' })
   const [horarios, setHorarios] = useState(() => horariosFromRaw(null))
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -33,6 +33,8 @@ export default function Configuracoes() {
         pix_chave: data.pix_chave ?? '',
         pix_nome: data.pix_nome ?? '',
         pix_tipo: data.pix_tipo ?? 'Celular',
+        pdv_senha: data.pdv_senha ?? '',
+        funcionario_senha: data.funcionario_senha ?? '',
       })
       setHorarios(horariosFromRaw(data.horarios_funcionamento))
     } catch {
@@ -60,6 +62,8 @@ export default function Configuracoes() {
         api.patch('/api/admin/configuracoes/pix_chave',              { valor: String(form.pix_chave) }),
         api.patch('/api/admin/configuracoes/pix_nome',               { valor: String(form.pix_nome) }),
         api.patch('/api/admin/configuracoes/pix_tipo',               { valor: String(form.pix_tipo) }),
+        ...(form.pdv_senha ? [api.patch('/api/admin/configuracoes/pdv_senha', { valor: String(form.pdv_senha) })] : []),
+        ...(form.funcionario_senha ? [api.patch('/api/admin/configuracoes/funcionario_senha', { valor: String(form.funcionario_senha) })] : []),
       ])
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
@@ -156,6 +160,36 @@ export default function Configuracoes() {
               </div>
             )}
           </div>
+        </Card>
+
+        {/* PDV */}
+        <Card title="PDV — Balcão" icon="🏪">
+          <Field label="Senha do PDV">
+            <input
+              className="input"
+              type="password"
+              value={form.pdv_senha}
+              onChange={e => setField('pdv_senha', e.target.value)}
+              placeholder="Deixe em branco para não alterar"
+              autoComplete="new-password"
+            />
+            <p className="text-xs text-gray-400 mt-1">Senha usada para acessar o app de balcão em /pdv</p>
+          </Field>
+        </Card>
+
+        {/* Funcionário */}
+        <Card title="Acesso Funcionário" icon="👤">
+          <Field label="Senha do funcionário">
+            <input
+              className="input"
+              type="password"
+              value={form.funcionario_senha}
+              onChange={e => setField('funcionario_senha', e.target.value)}
+              placeholder="Deixe em branco para não alterar"
+              autoComplete="new-password"
+            />
+            <p className="text-xs text-gray-400 mt-1">Senha do painel com acesso limitado (sem caixa, balcão, config. e relatórios)</p>
+          </Field>
         </Card>
 
         {/* Horários */}

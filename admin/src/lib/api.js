@@ -15,6 +15,7 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) {
       localStorage.removeItem('dubon_token')
+      localStorage.removeItem('dubon_role')
       window.location.href = '/admin/login'
     }
     return Promise.reject(err)

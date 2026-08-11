@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../lib/api'
 import Modal from '../components/Modal'
+import { isAdmin } from '../lib/auth'
 
 const INITIAL = { nome: '', whatsapp: '' }
 
@@ -121,6 +122,7 @@ export default function Entregadores() {
 }
 
 function EntregadorCard({ ent, onToggle, onEdit, onDelete }) {
+  const admin = isAdmin()
   return (
     <div className={`bg-white rounded-xl shadow-sm border p-4 flex items-center gap-3 transition-opacity ${ent.ativo ? '' : 'opacity-60'}`}>
       <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center text-xl flex-shrink-0">
@@ -147,7 +149,7 @@ function EntregadorCard({ ent, onToggle, onEdit, onDelete }) {
         )}
       </div>
       <button onClick={onEdit} className="text-gray-300 hover:text-gray-600 p-1.5">✏️</button>
-      <button onClick={onDelete} className="text-gray-300 hover:text-red-400 p-1.5">🗑️</button>
+      {admin && <button onClick={onDelete} className="text-gray-300 hover:text-red-400 p-1.5">🗑️</button>}
       <label className="flex items-center gap-1.5 cursor-pointer">
         <span className="text-xs text-gray-400">{ent.ativo ? 'Ativo' : 'Ativar'}</span>
         <button

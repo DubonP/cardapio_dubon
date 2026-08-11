@@ -15,6 +15,8 @@ export default function Login() {
     try {
       const { data } = await api.post('/api/auth/login', { senha })
       localStorage.setItem('dubon_token', data.token)
+      const { data: me } = await api.get('/api/auth/me')
+      localStorage.setItem('dubon_role', me.role)
       navigate('/pedidos', { replace: true })
     } catch (err) {
       setErro(err.response?.data?.error || 'Erro ao fazer login')

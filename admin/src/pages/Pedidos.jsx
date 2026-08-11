@@ -48,14 +48,17 @@ function gerarReciboHTML(pedido) {
   const dt = new Date(pedido.criadoEm).toLocaleString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
+    timeZone: 'America/Sao_Paulo',
   })
 
   const itensHTML = pedido.itens
     .map((item) => {
       const isKilo = item.produto?.categoria?.tipo === 'KILO'
-      const nome = item.produto?.nome ?? '(produto removido)'
+      const catNome = item.produto?.categoria?.nome
+      const prodNome = item.produto?.nome ?? '(produto removido)'
+      const nome = (!isKilo && catNome) ? `${catNome} - ${prodNome}` : prodNome
       const label = isKilo
-        ? `${item.quantidade * 100}g × ${nome}`
+        ? `${item.quantidade}g × ${nome}`
         : `${item.quantidade} × ${nome}`
       const obsHTML = isKilo && item.observacao
         ? `<div style="font-size:11px;padding-left:4px;color:#444">↳ ${item.observacao}</div>`
@@ -126,7 +129,7 @@ function resumoItens(itens) {
       const isKilo = i.produto?.categoria?.tipo === 'KILO'
       const nome = i.produto?.nome ?? '(produto removido)'
       const label = isKilo
-        ? `${i.quantidade * 100}g × ${nome}`
+        ? `${i.quantidade}g × ${nome}`
         : `${i.quantidade} × ${nome}`
       return i.observacao ? `${label} (${i.observacao})` : label
     })
@@ -327,7 +330,7 @@ export default function Pedidos() {
         <div>
           <h1 className="text-xl font-bold text-brand">Pedidos</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {pedidosAtivos.length} pedidos · {fmt(receita)} de receita
+            {pedidosAtivos.length} pedidos
           </p>
         </div>
         <button
@@ -493,7 +496,7 @@ export default function Pedidos() {
                   <div key={idx} className="bg-gray-50 rounded-lg px-3 py-2 space-y-1.5">
                     <div className="flex items-center gap-2">
                       <span className="flex-1 text-sm text-gray-700 truncate">
-                        {item.tipo === 'KILO' ? `${item.quantidade * 100}g` : `${item.quantidade}×`} {item.nome}
+                        {item.tipo === 'KILO' ? `${item.quantidade}g` : `${item.quantidade}×`} {item.nome}
                       </span>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
@@ -681,11 +684,11 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onPagamentoParcial, onMsg, on
   // Priority: cancelado > finalizado > saiu > impresso > avisado > pago > default
   const cardStyle = (() => {
     if (isCanceled)    return { bg: 'bg-gray-200 border-gray-400', wm: 'CANCELADO', wmColor: '#374151' }
-    if (p.finalizado)  return { bg: 'bg-yellow-50 border-yellow-300', wm: 'FINALIZADO', wmColor: '#a16207' }
-    if (p.saiuEntrega) return { bg: 'bg-green-50 border-green-300', wm: 'SAIU', wmColor: '#15803d' }
-    if (p.impresso)    return { bg: 'bg-blue-50 border-blue-300', wm: 'IMPRESSO', wmColor: '#1d4ed8' }
-    if (p.avisado)     return { bg: 'bg-purple-50 border-purple-300', wm: 'AVISADO', wmColor: '#7e22ce' }
-    if (p.pago)        return { bg: 'bg-amber-50 border-amber-300', wm: 'PAGO', wmColor: '#b45309' }
+    if (p.finalizado)  return { bg: 'bg-red-100 border-red-400', wm: 'FINALIZADO', wmColor: '#b91c1c' }
+    if (p.saiuEntrega) return { bg: 'bg-green-100 border-green-400', wm: 'SAIU', wmColor: '#15803d' }
+    if (p.impresso)    return { bg: 'bg-blue-100 border-blue-400', wm: 'IMPRESSO', wmColor: '#1d4ed8' }
+    if (p.avisado)     return { bg: 'bg-purple-100 border-purple-400', wm: 'AVISADO', wmColor: '#7e22ce' }
+    if (p.pago)        return { bg: 'bg-amber-100 border-amber-400', wm: 'PAGO', wmColor: '#b45309' }
     return { bg: 'bg-white border-gray-200', wm: null }
   })()
 
@@ -749,7 +752,7 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onPagamentoParcial, onMsg, on
             {statusInfo.label}
           </span>
           <span className="text-xs text-gray-400">
-            {new Date(p.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            {new Date(p.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}
           </span>
         </div>
         <div className="flex flex-col items-end gap-0.5 shrink-0">
@@ -838,7 +841,7 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onPagamentoParcial, onMsg, on
                 : 'bg-green-50 text-green-700 hover:bg-green-100'
             }`}
           >
-            📱 Avisar cliente{p.whatsappEnviado ? ' ✓' : ''}
+            📱 Agrad. cliente{p.whatsappEnviado ? ' ✓' : ''}
           </button>
         )}
         {isEntrega && (
@@ -915,6 +918,7 @@ function gerarReciboTexto(p) {
   const dt = new Date(p.criadoEm).toLocaleString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
+    timeZone: 'America/Sao_Paulo',
   })
 
   const lines = [
@@ -928,10 +932,13 @@ function gerarReciboTexto(p) {
 
   p.itens.forEach((item) => {
     const isKilo = item.produto?.categoria?.tipo === 'KILO'
-    const qty = isKilo ? `${item.quantidade * 100}g` : `${item.quantidade}x`
-    const nomeProd = item.produto?.nome ?? '(produto removido)'
-    const nome = nomeProd.substring(0, W - qty.length - fmt(item.totalItem).length - 3)
+    const qty = isKilo ? `${item.quantidade}g` : `${item.quantidade}x`
+    const catNome = item.produto?.categoria?.nome
+    const prodNome = item.produto?.nome ?? '(produto removido)'
+    const nomeFull = (!isKilo && catNome) ? `${catNome} - ${prodNome}` : prodNome
     const val = fmt(item.totalItem)
+    const maxLen = W - qty.length - val.length - 3
+    const nome = nomeFull.substring(0, maxLen)
     const label = `${qty} ${nome}`
     const space = Math.max(1, W - label.length - val.length)
     lines.push(`${label}${' '.repeat(space)}${val}`)
