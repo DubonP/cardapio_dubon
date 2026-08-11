@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../lib/api'
 import Modal from '../components/Modal'
+import { isAdmin } from '../lib/auth'
 
 const fmt = (v) => 'R$ ' + Number(v).toFixed(2).replace('.', ',')
 
@@ -31,6 +32,7 @@ export default function Cardapio() {
   const [cats, setCats] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
+  const admin = isAdmin()
 
   // modals
   const [catModal, setCatModal] = useState(null)     // null | { mode:'add'|'edit', data }
@@ -101,7 +103,7 @@ export default function Cardapio() {
         }
         const { data } = await api.post('/api/admin/categorias', catPayload)
         const newCat = { ...data, produtos: [], precosPorQuantidade: [] }
-        if (formData.preco && (formData.tipo === 'POTE' || formData.tipo === 'BEBIDA')) {
+        if (formData.preco && formData.tipo === 'POTE') {
           await api.put(`/api/admin/categorias/${data.id}/precos`, [
             { quantidadeMinima: 1, preco: parseFloat(formData.preco) },
           ])
@@ -115,7 +117,7 @@ export default function Cardapio() {
           updatePayload.precoKilo = parseFloat(formData.precoKilo)
         }
         await api.patch(`/api/admin/categorias/${catModal.data.id}`, updatePayload)
-        if (formData.preco && (tipo === 'POTE' || tipo === 'BEBIDA')) {
+        if (formData.preco && tipo === 'POTE') {
           await api.put(`/api/admin/categorias/${catModal.data.id}/precos`, [
             { quantidadeMinima: 1, preco: parseFloat(formData.preco) },
           ])
@@ -152,11 +154,14 @@ export default function Cardapio() {
     const ordem = parseInt(formData.ordem) || 0
     const isCasquinha = prodModal.catTipo === 'CASQUINHA'
     const isTacaProd  = prodModal.catTipo === 'TACA'
+    const isBebida    = prodModal.catTipo === 'BEBIDA'
     try {
       const extra = isCasquinha
         ? { subtipo: formData.subtipo, preco: parseFloat(formData.preco) || null }
         : isTacaProd
         ? { preco: parseFloat(formData.preco) || null, temSabores: !!formData.temSabores, maxSabores: formData.temSabores ? (parseInt(formData.maxSabores) || 1) : null }
+        : isBebida
+        ? { preco: parseFloat(formData.preco) || null }
         : { tamanho: formData.tamanho || null }
 
       if (prodModal.mode === 'add') {
@@ -219,12 +224,14 @@ export default function Cardapio() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Cardápio</h1>
-        <button
-          onClick={() => setCatModal({ mode: 'add', data: { ...INITIAL_CAT } })}
-          className="bg-brand text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-brand-light transition-colors"
-        >
-          + Categoria
-        </button>
+        {admin && (
+          <button
+            onClick={() => setCatModal({ mode: 'add', data: { ...INITIAL_CAT } })}
+            className="bg-brand text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-brand-light transition-colors"
+          >
+            + Categoria
+          </button>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -232,6 +239,7 @@ export default function Cardapio() {
           <CatCard
             key={cat.id}
             cat={cat}
+            canEdit={admin}
             onToggleCat={() => toggleCat(cat)}
             onEditCat={() => setCatModal({ mode: 'edit', data: cat })}
             onAddProd={() => setProdModal({ mode: 'add', catId: cat.id, catTipo: cat.tipo, data: { ...INITIAL_PROD } })}
@@ -285,11 +293,11 @@ export default function Cardapio() {
 }
 
 // ── CatCard ──────────────────────────────────────────────────────
-function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleProd, onDeleteProd, onDeleteCat, onEditPrecos }) {
+function CatCard({ cat, canEdit, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleProd, onDeleteProd, onDeleteCat, onEditPrecos }) {
   const [open, setOpen] = useState(false)
   const isPicole = cat.tipo === 'PICOLE'
   const isKilo = cat.tipo === 'KILO'
-  const simplePrice = !isPicole && !isKilo && cat.precosPorQuantidade?.[0]?.preco
+  const simplePrice = cat.tipo === 'POTE' && cat.precosPorQuantidade?.[0]?.preco
 
   return (
     <div className={`bg-white rounded-xl shadow-sm border transition-opacity ${cat.ativo ? '' : 'opacity-60'}`}>
@@ -324,7 +332,7 @@ function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleP
           <span className="text-sm text-gray-500 flex-shrink-0">{fmt(cat.precoKilo)}/kg</span>
         )}
 
-        {isPicole && (
+        {isPicole && canEdit && (
           <button
             onClick={e => { e.stopPropagation(); onEditPrecos() }}
             className="text-xs text-brand border border-brand/30 px-2 py-0.5 rounded hover:bg-brand/5 flex-shrink-0"
@@ -333,19 +341,23 @@ function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleP
           </button>
         )}
 
-        <button
-          onClick={e => { e.stopPropagation(); onEditCat() }}
-          className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0"
-        >
-          ✏️
-        </button>
-        <button
-          onClick={e => { e.stopPropagation(); onDeleteCat() }}
-          className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0"
-          title="Excluir categoria"
-        >
-          🗑️
-        </button>
+        {canEdit && (
+          <button
+            onClick={e => { e.stopPropagation(); onEditCat() }}
+            className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0"
+          >
+            ✏️
+          </button>
+        )}
+        {canEdit && (
+          <button
+            onClick={e => { e.stopPropagation(); onDeleteCat() }}
+            className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0"
+            title="Excluir categoria"
+          >
+            🗑️
+          </button>
+        )}
 
         <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
           <Toggle checked={cat.ativo} onChange={onToggleCat} />
@@ -375,7 +387,7 @@ function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleP
                   {prod.tamanho && !prod.subtipo && (
                     <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{prod.tamanho}</span>
                   )}
-                  {prod.preco != null && (cat.tipo === 'CASQUINHA' || cat.tipo === 'TACA') && (
+                  {prod.preco != null && (cat.tipo === 'CASQUINHA' || cat.tipo === 'TACA' || cat.tipo === 'BEBIDA') && (
                     <span className="text-xs text-gray-500">{fmt(prod.preco)}</span>
                   )}
                 </div>
@@ -383,18 +395,20 @@ function CatCard({ cat, onToggleCat, onEditCat, onAddProd, onEditProd, onToggleP
                   <p className="text-xs text-gray-400 truncate mt-0.5">{prod.descricao}</p>
                 )}
               </div>
-              <button onClick={() => onEditProd(prod)} className="text-gray-300 hover:text-gray-500 p-1 flex-shrink-0">✏️</button>
-              <button onClick={() => onDeleteProd(prod.id)} className="text-gray-300 hover:text-red-400 p-1 flex-shrink-0">🗑️</button>
+              {canEdit && <button onClick={() => onEditProd(prod)} className="text-gray-300 hover:text-gray-500 p-1 flex-shrink-0">✏️</button>}
+              {canEdit && <button onClick={() => onDeleteProd(prod.id)} className="text-gray-300 hover:text-red-400 p-1 flex-shrink-0">🗑️</button>}
               <div className="flex-shrink-0">
                 <Toggle checked={prod.disponivel} onChange={() => onToggleProd(prod)} />
               </div>
             </div>
           ))}
-          <div className="px-4 py-2">
-            <button onClick={onAddProd} className="text-xs text-brand font-medium hover:underline">
-              {cat.tipo === 'TACA' ? '+ Adicionar opção' : cat.tipo === 'CASQUINHA' ? '+ Adicionar casquinha' : '+ Adicionar sabor'}
-            </button>
-          </div>
+          {canEdit && (
+            <div className="px-4 py-2">
+              <button onClick={onAddProd} className="text-xs text-brand font-medium hover:underline">
+                {cat.tipo === 'TACA' ? '+ Adicionar opção' : cat.tipo === 'CASQUINHA' ? '+ Adicionar casquinha' : cat.tipo === 'BEBIDA' ? '+ Adicionar bebida' : '+ Adicionar sabor'}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -427,7 +441,7 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
 
   const isEdit = mode === 'edit'
   const tipo = isEdit ? initial.tipo : form.tipo
-  const needsPrice = tipo === 'POTE' || tipo === 'BEBIDA'
+  const needsPrice = tipo === 'POTE'
   const needsPrecoKilo = tipo === 'KILO'
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
@@ -544,6 +558,7 @@ function CatFormModal({ mode, initial, onSave, onClose, saving }) {
 function ProdFormModal({ mode, catTipo, initial, onSave, onClose, saving }) {
   const isCasquinha = catTipo === 'CASQUINHA'
   const isTaca      = catTipo === 'TACA'
+  const isBebida    = catTipo === 'BEBIDA'
   const [form, setForm] = useState({
     nome:       initial.nome       || '',
     ordem:      initial.ordem      ?? 0,
@@ -561,6 +576,8 @@ function ProdFormModal({ mode, catTipo, initial, onSave, onClose, saving }) {
     ? (mode === 'edit' ? 'Editar casquinha' : 'Nova casquinha')
     : isTaca
     ? (mode === 'edit' ? 'Editar opção de taça' : 'Nova opção de taça')
+    : isBebida
+    ? (mode === 'edit' ? 'Editar bebida' : 'Nova bebida')
     : (mode === 'edit' ? 'Editar sabor' : 'Novo sabor')
 
   return (
@@ -581,12 +598,12 @@ function ProdFormModal({ mode, catTipo, initial, onSave, onClose, saving }) {
       }
     >
       <div className="space-y-4">
-        <Field label={isCasquinha ? 'Nome da casquinha' : isTaca ? 'Nome da opção' : 'Nome do sabor'}>
+        <Field label={isCasquinha ? 'Nome da casquinha' : isTaca ? 'Nome da opção' : isBebida ? 'Nome da bebida' : 'Nome do sabor'}>
           <input
             className="input"
             value={form.nome}
             onChange={e => set('nome', e.target.value)}
-            placeholder={isCasquinha ? 'Ex: Cascão Biju' : isTaca ? 'Ex: Taça Simples' : 'Ex: Chocolate'}
+            placeholder={isCasquinha ? 'Ex: Cascão Biju' : isTaca ? 'Ex: Taça Simples' : isBebida ? 'Ex: Coca-Cola 2 Litros' : 'Ex: Chocolate'}
             autoFocus
           />
         </Field>
@@ -651,6 +668,18 @@ function ProdFormModal({ mode, catTipo, initial, onSave, onClose, saving }) {
               )}
             </div>
           </>
+        ) : isBebida ? (
+          <Field label="Preço (R$)">
+            <input
+              className="input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.preco}
+              onChange={e => set('preco', e.target.value)}
+              placeholder="0,00"
+            />
+          </Field>
         ) : (
           <Field label="Tamanho (opcional)">
             <input

@@ -195,12 +195,14 @@ function QuickAddModal({ cat, rawCats, comanda, onAdicionado, onClose }) {
   const isOutros    = cat.tipo === 'OUTROS'
   const isTaca      = cat.tipo === 'TACA'
   const isCasquinha = cat.tipo === 'CASQUINHA'
+  const isBebida    = cat.tipo === 'BEBIDA'
   const temProdutos = (cat.produtos?.length || 0) > 0
-  // Categorias tipo Pote/Bebida: preço é sempre por categoria (mesmo valor
-  // pra qualquer sabor), então não faz sentido obrigar escolher qual sabor —
-  // funciona igual ao Picolé, só categoria + quantidade. Casquinha (produtos
-  // com preços diferentes de verdade) e Taça (mecanismo próprio) ficam de fora.
-  const simplificarProduto = temProdutos && !isTaca && !isCasquinha
+  // Categoria tipo Pote: preço é sempre por categoria (mesmo valor pra
+  // qualquer sabor), então não faz sentido obrigar escolher qual sabor —
+  // funciona igual ao Picolé, só categoria + quantidade. Bebida, Casquinha
+  // (produtos com preços diferentes de verdade) e Taça (mecanismo próprio)
+  // ficam de fora — pedem pra escolher qual produto, com preço individual.
+  const simplificarProduto = temProdutos && !isTaca && !isCasquinha && !isBebida
 
   const [prodIdx, setProdIdx]           = useState(0)
   const [quantidade, setQuantidade]     = useState(1)
