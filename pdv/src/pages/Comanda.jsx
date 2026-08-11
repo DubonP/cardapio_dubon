@@ -23,6 +23,23 @@ function displayQtd(item) {
   return `${item.quantidade}×`
 }
 
+function brDataInfo() {
+  const agora = new Date()
+  const partes = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    weekday: 'long', day: '2-digit', month: '2-digit', year: '2-digit',
+  }).formatToParts(agora)
+  const weekday = partes.find((p) => p.type === 'weekday').value
+  const day = partes.find((p) => p.type === 'day').value
+  const month = partes.find((p) => p.type === 'month').value
+  const year = partes.find((p) => p.type === 'year').value
+  const abrev = weekday.slice(0, 3)
+  return {
+    dataStr: `${day}/${month}/${year}`,
+    diaSemanaAbrev: abrev.charAt(0).toUpperCase() + abrev.slice(1),
+  }
+}
+
 function resolverFaixaPreco(faixas, total) {
   if (!faixas?.length) return null
   const sorted = [...faixas].sort((a, b) => b.quantidadeMinima - a.quantidadeMinima)
@@ -122,99 +139,25 @@ function Modal({ mensagem, onConfirmar, onCancelar, confirmarLabel = 'Confirmar'
   )
 }
 
-// ─── Modal Nova Comanda ───────────────────────────────────────────────────────
-
-function NovaComandaModal({ onClose, onCreate }) {
-  const [nome, setNome] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [erro, setErro] = useState('')
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setErro('')
-    setLoading(true)
-    try {
-      const data = await ops.criarComanda({ clienteNome: nome.trim() })
-      onCreate(data)
-    } catch (err) {
-      setErro(err.response?.data?.error || 'Erro ao criar comanda')
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-        <h2 className="text-xl font-bold text-slate-800 mb-1">Nova Comanda</h2>
-        <p className="text-sm text-slate-400 mb-4">Nome do cliente é opcional</p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="text"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-            placeholder="Nome do cliente (opcional)"
-            className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand"
-            autoFocus
-          />
-          {erro && <p className="text-red-600 text-sm">{erro}</p>}
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose}
-              className="flex-1 border border-slate-300 text-slate-700 font-semibold py-3 rounded-xl">
-              Cancelar
-            </button>
-            <button type="submit" disabled={loading}
-              className="flex-1 bg-brand text-white font-semibold py-3 rounded-xl disabled:opacity-50">
-              {loading ? 'Criando…' : 'Abrir'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
 
-function Sidebar({ comandaAtualId, onNovaComanda }) {
-  const [comandas, setComandas] = useState([])
+function Sidebar({ comandas, comandaAtualId, zonaAtiva, focoIdx, onSelecionar }) {
   const navigate = useNavigate()
-
-  const carregar = useCallback(async () => {
-    try {
-      const data = await ops.listarComandas()
-      setComandas(data)
-    } catch {}
-  }, [])
-
-  useEffect(() => {
-    carregar()
-    const interval = setInterval(carregar, 15000)
-    return () => clearInterval(interval)
-  }, [carregar])
-
-  useEffect(() => { carregar() }, [comandaAtualId, carregar])
 
   return (
     <aside className="w-56 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 overflow-hidden">
-      <div className="p-3 border-b border-slate-100">
-        <button
-          onClick={onNovaComanda}
-          className="w-full bg-brand text-white font-bold py-3 rounded-xl text-base flex items-center justify-center gap-1 active:scale-95 transition-transform"
-        >
-          + Nova Comanda
-        </button>
-      </div>
-
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {comandas.length === 0 ? (
           <p className="text-sm text-slate-400 text-center py-4">Nenhuma aberta</p>
         ) : (
-          comandas.map((c) => (
+          comandas.map((c, i) => (
             <button
               key={c.id}
-              onClick={() => navigate(`/comanda/${c.id}`)}
+              onClick={() => onSelecionar(c.id)}
               className={`w-full text-left px-3 py-2.5 rounded-xl transition-colors border ${
-                c.id === Number(comandaAtualId)
+                zonaAtiva && focoIdx === i
+                  ? 'border-brand ring-2 ring-brand bg-brand/5'
+                  : String(c.id) === String(comandaAtualId)
                   ? 'bg-brand/10 text-brand font-semibold border-brand/20'
                   : 'hover:bg-slate-50 text-slate-700 border-transparent'
               }`}
@@ -253,6 +196,11 @@ function QuickAddModal({ cat, rawCats, comanda, onAdicionado, onClose }) {
   const isTaca      = cat.tipo === 'TACA'
   const isCasquinha = cat.tipo === 'CASQUINHA'
   const temProdutos = (cat.produtos?.length || 0) > 0
+  // Categorias tipo Pote/Bebida: preço é sempre por categoria (mesmo valor
+  // pra qualquer sabor), então não faz sentido obrigar escolher qual sabor —
+  // funciona igual ao Picolé, só categoria + quantidade. Casquinha (produtos
+  // com preços diferentes de verdade) e Taça (mecanismo próprio) ficam de fora.
+  const simplificarProduto = temProdutos && !isTaca && !isCasquinha
 
   const [prodIdx, setProdIdx]           = useState(0)
   const [quantidade, setQuantidade]     = useState(1)
@@ -276,12 +224,13 @@ function QuickAddModal({ cat, rawCats, comanda, onAdicionado, onClose }) {
       return v > 0 ? v : null
     }
     if (isPicole) return resolverFaixaPreco(cat.precosPorQuantidade, picoleExistentes + quantidade)
+    if (simplificarProduto) return resolverFaixaPreco(cat.precosPorQuantidade, 1)
     if (temProdutos && produtoSelecionado) {
       if (produtoSelecionado.preco) return Number(produtoSelecionado.preco)
       return resolverFaixaPreco(cat.precosPorQuantidade, 1)
     }
     return resolverFaixaPreco(cat.precosPorQuantidade, 1)
-  }, [isKilo, isOutros, isPicole, temProdutos, valor, quantidade, picoleExistentes, produtoSelecionado, cat])
+  }, [isKilo, isOutros, isPicole, simplificarProduto, temProdutos, valor, quantidade, picoleExistentes, produtoSelecionado, cat])
 
   const totalItem = precoUnitario !== null
     ? (isKilo || isOutros ? precoUnitario : precoUnitario * quantidade)
@@ -292,11 +241,11 @@ function QuickAddModal({ cat, rawCats, comanda, onAdicionado, onClose }) {
     const t = setTimeout(() => {
       if (isKilo) valorRef.current?.focus()
       else if (isOutros) descRef.current?.focus()
-      else if (isPicole) qtdRef.current?.focus()
-      // para categorias com produtos, ↑↓ navega sem foco DOM
+      else if (isPicole || simplificarProduto) qtdRef.current?.focus()
+      // para categorias com lista de produtos (Casquinha), ↑↓ navega sem foco DOM
     }, 30)
     return () => clearTimeout(t)
-  }, [isKilo, isOutros, isPicole])
+  }, [isKilo, isOutros, isPicole, simplificarProduto])
 
   // Scroll do produto selecionado para view
   useEffect(() => {
@@ -337,6 +286,16 @@ function QuickAddModal({ cat, rawCats, comanda, onAdicionado, onClose }) {
       return
     }
 
+    if (simplificarProduto) {
+      const pu = resolverFaixaPreco(cat.precosPorQuantidade, 1)
+      if (!pu) { setErro('Preço não encontrado'); return }
+      setLoading(true)
+      try { await onAdicionado({ tipo: tipoBackendFromCat(cat), descricao: cat.nome, quantidade, valorUnitario: pu, categoriaId: cat.id }); onClose() }
+      catch (e) { setErro(e.response?.data?.error || 'Erro ao adicionar') }
+      finally { setLoading(false) }
+      return
+    }
+
     if (temProdutos) {
       if (!produtoSelecionado) { setErro('Selecione um sabor'); return }
       const pu = produtoSelecionado.preco
@@ -368,7 +327,7 @@ function QuickAddModal({ cat, rawCats, comanda, onAdicionado, onClose }) {
       if (e.key === 'Escape') { onClose(); return }
       const tag = document.activeElement?.tagName?.toLowerCase()
       const isInput = ['input', 'textarea', 'select'].includes(tag)
-      if (temProdutos && !isInput) {
+      if (temProdutos && !simplificarProduto && !isInput) {
         if (e.key === 'ArrowDown') { e.preventDefault(); setProdIdx((i) => Math.min((cat.produtos?.length || 1) - 1, i + 1)) }
         if (e.key === 'ArrowUp')   { e.preventDefault(); setProdIdx((i) => Math.max(0, i - 1)) }
       }
@@ -376,7 +335,7 @@ function QuickAddModal({ cat, rawCats, comanda, onAdicionado, onClose }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, temProdutos, cat])
+  }, [onClose, temProdutos, simplificarProduto, cat])
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={onClose}>
@@ -464,8 +423,8 @@ function QuickAddModal({ cat, rawCats, comanda, onAdicionado, onClose }) {
             </>
           )}
 
-          {/* Produtos (POTE / CASQUINHA / TACA / BEBIDA) — obrigatório selecionar */}
-          {temProdutos && !isKilo && !isPicole && (
+          {/* Produtos (Casquinha / Taça) — obrigatório selecionar; Pote/Bebida pulam essa etapa */}
+          {temProdutos && !isKilo && !isPicole && !simplificarProduto && (
             <div className="space-y-1 max-h-56 overflow-y-auto">
               {cat.produtos.map((p, i) => (
                 <button
@@ -492,6 +451,7 @@ function QuickAddModal({ cat, rawCats, comanda, onAdicionado, onClose }) {
             <div className="flex items-center justify-between gap-4">
               <label className="text-base text-slate-600 font-medium">Quantidade:</label>
               <input
+                ref={simplificarProduto ? qtdRef : undefined}
                 type="number" inputMode="numeric" min="1"
                 value={quantidade}
                 onChange={(e) => setQuantidade(Math.max(1, parseInt(e.target.value) || 1))}
@@ -549,14 +509,9 @@ function QuickAddModal({ cat, rawCats, comanda, onAdicionado, onClose }) {
 
 // ─── Formulário de itens — só as chips de categoria ───────────────────────────
 
-function AdicionarItemForm({ comanda, onAdicionado, bloqueado }) {
+function AdicionarItemForm({ comanda, onAdicionado, bloqueado, ativo, catFocoIdx, onCatsCarregadas, onSelecionarCat, showQuickAdd, onShowQuickAdd }) {
   const [rawCats, setRawCats]           = useState([])
-  const [catId, setCatId]               = useState(null)
   const [carregando, setCarregando]     = useState(true)
-  const [showQuickAdd, setShowQuickAdd] = useState(false)
-
-  const allCatsRef = useRef([])
-  const catIdRef   = useRef(null)
 
   useEffect(() => {
     ops.carregarCardapio().then((data) => {
@@ -566,42 +521,28 @@ function AdicionarItemForm({ comanda, onAdicionado, bloqueado }) {
         return 0
       })
       setRawCats(cats)
-      if (cats.length > 0) setCatId(cats[0].id)
     }).catch(() => {}).finally(() => setCarregando(false))
   }, [])
 
   const allCats = useMemo(() => [...rawCats, OUTROS_CAT], [rawCats])
-  const cat     = allCats.find((c) => c.id === catId) || null
+  const cat     = allCats[catFocoIdx] || null
 
-  useEffect(() => { allCatsRef.current = allCats }, [allCats])
-  useEffect(() => { catIdRef.current   = catId   }, [catId])
+  useEffect(() => { onCatsCarregadas(allCats.length) }, [allCats, onCatsCarregadas])
 
-  // Teclado: ← → categorias, Enter abre popup
+  // Enter abre o popup de adicionar pra categoria em foco (a navegação ↑↓←→
+  // entre categorias/zonas é toda controlada pelo componente pai).
   useEffect(() => {
-    if (showQuickAdd) return
+    if (showQuickAdd || !ativo) return
     function handler(e) {
+      if (e.key !== 'Enter') return
       const tag = document.activeElement?.tagName?.toLowerCase()
       if (['input', 'textarea', 'select'].includes(tag)) return
-      const cats = allCatsRef.current
-      const idx  = cats.findIndex((x) => x.id === catIdRef.current)
-      if (idx < 0) return
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        e.preventDefault()
-        const dir = e.key === 'ArrowLeft' ? -1 : 1
-        setCatId(cats[(idx + dir + cats.length) % cats.length].id)
-      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        e.preventDefault()
-        const dir = e.key === 'ArrowUp' ? -4 : 4
-        const newIdx = idx + dir
-        if (newIdx >= 0 && newIdx < cats.length) setCatId(cats[newIdx].id)
-      } else if (e.key === 'Enter') {
-        e.preventDefault()
-        setShowQuickAdd(true)
-      }
+      e.preventDefault()
+      onShowQuickAdd(true)
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [showQuickAdd])
+  }, [showQuickAdd, ativo, onShowQuickAdd])
 
   if (carregando) {
     return (
@@ -615,19 +556,21 @@ function AdicionarItemForm({ comanda, onAdicionado, bloqueado }) {
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-slate-700 text-lg">Adicionar item</h3>
-        <span className="text-xs text-slate-400 hidden sm:block">← → ↑ ↓ categorias &nbsp;·&nbsp; Enter adicionar</span>
+        <span className="text-xs text-slate-400 hidden sm:block">↑ ↓ ← → navega &nbsp;·&nbsp; Enter adiciona</span>
       </div>
 
       <div className="grid grid-cols-4 gap-2">
-        {allCats.map((c) => (
+        {allCats.map((c, i) => (
           <button
             key={c.id}
             type="button"
             disabled={bloqueado}
-            onClick={() => { setCatId(c.id); setShowQuickAdd(true) }}
+            onClick={() => { onSelecionarCat(i); onShowQuickAdd(true) }}
             className={`px-3 py-2 rounded-xl text-base font-semibold border transition-colors disabled:opacity-40 ${
-              catId === c.id
-                ? 'bg-brand text-white border-brand'
+              ativo && catFocoIdx === i
+                ? 'bg-brand text-white border-brand ring-2 ring-brand ring-offset-1'
+                : catFocoIdx === i
+                ? 'bg-white text-brand border-brand'
                 : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
             }`}
           >
@@ -642,60 +585,72 @@ function AdicionarItemForm({ comanda, onAdicionado, bloqueado }) {
           rawCats={rawCats}
           comanda={comanda}
           onAdicionado={onAdicionado}
-          onClose={() => setShowQuickAdd(false)}
+          onClose={() => onShowQuickAdd(false)}
         />
       )}
     </div>
   )
 }
 
-// ─── Modal editar nome do cliente ────────────────────────────────────────────
+// ─── Nome do cliente, em destaque e editável inline no cabeçalho ─────────────
 
-function EditarNomeModal({ nomeAtual, onClose, onSalvar }) {
-  const [nome, setNome] = useState(nomeAtual === '—' ? '' : nomeAtual)
-  const [loading, setLoading] = useState(false)
-  const [erro, setErro] = useState('')
+function NomeClienteHeader({ comanda, editando, onIniciarEdicao, onSalvar, nomeBtnRef, focado }) {
+  const [valor, setValor] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const inputRef = useRef(null)
 
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setErro('')
-    setLoading(true)
+  useEffect(() => {
+    if (!editando) return
+    setValor(comanda.clienteNome === '—' || !comanda.clienteNome ? '' : comanda.clienteNome)
+    const t = setTimeout(() => {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }, 0)
+    return () => clearTimeout(t)
+  }, [editando, comanda.clienteNome])
+
+  async function confirmar() {
+    if (salvando) return
+    setSalvando(true)
     try {
-      await onSalvar(nome.trim() || '—')
-      onClose()
-    } catch (err) {
-      setErro(err.response?.data?.error || 'Erro ao salvar')
-      setLoading(false)
+      await onSalvar(valor.trim() || '—')
+    } finally {
+      setSalvando(false)
+      onIniciarEdicao(false)
     }
   }
 
+  if (editando) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={valor}
+        disabled={salvando}
+        onChange={(e) => setValor(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); confirmar() }
+          if (e.key === 'Escape') { e.preventDefault(); onIniciarEdicao(false) }
+        }}
+        onBlur={confirmar}
+        placeholder="Nome do cliente"
+        className="font-bold text-3xl leading-tight bg-white/15 rounded-lg px-2 py-0.5 outline-none ring-2 ring-white w-full"
+      />
+    )
+  }
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-        <h2 className="text-xl font-bold text-slate-800 mb-4">Editar nome do cliente</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="text"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-            placeholder="Nome do cliente (opcional)"
-            className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand"
-            autoFocus
-          />
-          {erro && <p className="text-red-600 text-sm">{erro}</p>}
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose}
-              className="flex-1 border border-slate-300 text-slate-700 font-semibold py-3 rounded-xl">
-              Cancelar
-            </button>
-            <button type="submit" disabled={loading}
-              className="flex-1 bg-brand text-white font-semibold py-3 rounded-xl disabled:opacity-50">
-              {loading ? 'Salvando…' : 'Salvar'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <button
+      ref={nomeBtnRef}
+      type="button"
+      onClick={() => onIniciarEdicao(true)}
+      className={`font-bold text-3xl leading-tight truncate text-left hover:underline decoration-dotted decoration-2 underline-offset-4 rounded-lg px-1 -mx-1 ${
+        focado ? 'ring-2 ring-white' : ''
+      }`}
+      title="Editar nome do cliente"
+    >
+      {nomeComanda(comanda)}
+    </button>
   )
 }
 
@@ -716,6 +671,7 @@ function PagamentoModal({ total, onClose, onConfirmar }) {
   const [step, setStep]                         = useState('escolha') // 'escolha' | 'troco' | 'notinha'
   const [valorRecebido, setValorRecebido]       = useState('')
   const [nomeCliente, setNomeCliente]           = useState('')
+  const [focoIdx, setFocoIdx]                   = useState(0)
   const trocoInputRef  = useRef(null)
   const nomeInputRef   = useRef(null)
   const parcialRef     = useRef(null)
@@ -739,11 +695,28 @@ function PagamentoModal({ total, onClose, onConfirmar }) {
         if (step !== 'escolha') { setStep('escolha'); return }
         if (parcialAtivo) { setParcialAtivo(false); setValorParcial(''); return }
         onClose()
+        return
+      }
+      // ↑ ↓ percorre as formas de pagamento, Enter confirma a destacada
+      if (step === 'escolha') {
+        const tag = document.activeElement?.tagName?.toLowerCase()
+        if (['input', 'textarea', 'select'].includes(tag)) return
+        if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          setFocoIdx((i) => Math.min(PAGAMENTOS.length - 1, i + 1))
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          setFocoIdx((i) => Math.max(0, i - 1))
+        } else if (e.key === 'Enter') {
+          e.preventDefault()
+          const parcialInvalido = parcialAtivo && (valorParcialNum <= 0 || valorParcialNum > totalRestante + 0.001)
+          if (!parcialInvalido) handleEscolha(PAGAMENTOS[focoIdx].value)
+        }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, step, parcialAtivo])
+  }, [onClose, step, parcialAtivo, focoIdx, valorParcialNum, totalRestante])
 
   function registrarParcial(forma) {
     if (valorParcialNum <= 0 || valorParcialNum > totalRestante + 0.001) return
@@ -881,6 +854,7 @@ function PagamentoModal({ total, onClose, onConfirmar }) {
           <h2 className="text-xl font-bold text-slate-800">Forma de pagamento</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none px-1">×</button>
         </div>
+        <p className="text-xs text-slate-400 mb-2 hidden sm:block">↑ ↓ escolhe &nbsp;·&nbsp; Enter confirma</p>
 
         {/* Pagamentos já feitos */}
         {pagamentosFeitos.length > 0 && (
@@ -942,12 +916,16 @@ function PagamentoModal({ total, onClose, onConfirmar }) {
         )}
 
         <div className="space-y-3">
-          {PAGAMENTOS.map((p) => (
+          {PAGAMENTOS.map((p, i) => (
             <button
               key={p.value}
-              onClick={() => !parcialInvalido && handleEscolha(p.value)}
+              onClick={() => { setFocoIdx(i); if (!parcialInvalido) handleEscolha(p.value) }}
               disabled={parcialAtivo && parcialInvalido}
-              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl border-2 border-slate-200 hover:border-brand hover:bg-brand/5 active:scale-95 transition-all text-left disabled:opacity-40 disabled:active:scale-100"
+              className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl border-2 transition-all text-left disabled:opacity-40 disabled:active:scale-100 ${
+                i === focoIdx
+                  ? 'border-brand bg-brand/5 ring-2 ring-brand ring-offset-1'
+                  : 'border-slate-200 hover:border-brand hover:bg-brand/5 active:scale-95'
+              }`}
             >
               <span className="text-3xl">{p.icon}</span>
               <div>
@@ -975,12 +953,41 @@ export default function Comanda() {
   const [comanda, setComanda] = useState(null)
   const [loading, setLoading] = useState(true)
   const [acao, setAcao] = useState(null)
-  const [showNovaComanda, setShowNovaComanda] = useState(false)
   const [pagamentoModal, setPagamentoModal] = useState(false)
   const [modal, setModal] = useState(null)
-  const [editarNome, setEditarNome] = useState(false)
+  const [editandoNome, setEditandoNome] = useState(false)
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [foco, setFoco] = useState('nome') // 'nome' | 'grid' | 'sidebar' | 'acoes'
+  const [catFocoIdx, setCatFocoIdx] = useState(0)
+  const [numCategorias, setNumCategorias] = useState(0)
+  const [comandasAbertas, setComandasAbertas] = useState([])
+  const [comandaFocoIdx, setComandaFocoIdx] = useState(0)
+  const [acaoFocoIdx, setAcaoFocoIdx] = useState(1) // 0 = cancelar, 1 = finalizar
   const online = useOnlineStatus()
   const bloqueado = !isPrincipal() && !online
+  const nomeBtnRef = useRef(null)
+  const dataHoje = brDataInfo()
+
+  useEffect(() => { setFoco('nome') }, [id])
+
+  const carregarSidebar = useCallback(async () => {
+    try {
+      const data = await ops.listarComandas()
+      setComandasAbertas(data)
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    carregarSidebar()
+    const interval = setInterval(carregarSidebar, 15000)
+    return () => clearInterval(interval)
+  }, [carregarSidebar])
+
+  useEffect(() => { carregarSidebar() }, [id, carregarSidebar])
+
+  useEffect(() => {
+    if (foco === 'nome' && !editandoNome) nomeBtnRef.current?.focus()
+  }, [foco, editandoNome])
 
   const carregar = useCallback(async () => {
     try {
@@ -1034,7 +1041,10 @@ export default function Comanda() {
   async function navegarProximaComanda() {
     try {
       const abertas = await ops.listarComandas()
-      if (abertas.length > 0) {
+      const reserva = abertas.find(ops.ehReserva)
+      if (reserva) {
+        navigate(`/comanda/${reserva.id}`, { replace: true })
+      } else if (abertas.length > 0) {
         navigate(`/comanda/${abertas[0].id}`, { replace: true })
       } else {
         const nova = await ops.criarComanda()
@@ -1093,10 +1103,87 @@ export default function Comanda() {
     setComanda(data)
   }
 
-  function handleCriada(novaComanda) {
-    setShowNovaComanda(false)
-    navigate(`/comanda/${novaComanda.id}`)
-  }
+  // Navegação por teclado dentro da comanda — 4 zonas em cruz:
+  //   nome (topo) — grid de categorias (centro, 4 colunas) — sidebar de comandas (à esquerda da 1ª coluna) — ações (abaixo da última linha)
+  // ↑↓←→ movem dentro da zona atual; ao sair de uma borda do grid, entra na zona vizinha.
+  const algumModalAberto = pagamentoModal || !!modal || editandoNome || showQuickAdd
+  useEffect(() => {
+    if (numCategorias > 0 && catFocoIdx >= numCategorias) setCatFocoIdx(numCategorias - 1)
+  }, [numCategorias, catFocoIdx])
+
+  useEffect(() => {
+    function handler(e) {
+      if (algumModalAberto || !comanda || comanda.status !== 'ABERTO') return
+      const tag = document.activeElement?.tagName?.toLowerCase()
+      if (['input', 'textarea', 'select'].includes(tag)) return
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Escape'].includes(e.key)) return
+
+      if (foco === 'nome') {
+        if (e.key === 'ArrowDown') { e.preventDefault(); setFoco('grid') }
+        else if (e.key === 'Enter') { e.preventDefault(); setEditandoNome(true) }
+        return
+      }
+
+      if (foco === 'grid') {
+        const col = catFocoIdx % 4
+        const row = Math.floor(catFocoIdx / 4)
+        if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          if (row > 0) setCatFocoIdx(catFocoIdx - 4)
+          else setFoco('nome')
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          if (catFocoIdx + 4 < numCategorias) setCatFocoIdx(catFocoIdx + 4)
+          else { setFoco('acoes'); setAcaoFocoIdx(1) }
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault()
+          if (col > 0) setCatFocoIdx(catFocoIdx - 1)
+          else {
+            const idxAtual = comandasAbertas.findIndex((c) => String(c.id) === String(id))
+            setComandaFocoIdx(idxAtual >= 0 ? idxAtual : 0)
+            setFoco('sidebar')
+          }
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault()
+          if (col < 3 && catFocoIdx + 1 < numCategorias) setCatFocoIdx(catFocoIdx + 1)
+        } else if (e.key === 'Enter') {
+          e.preventDefault()
+          setShowQuickAdd(true)
+        }
+        return
+      }
+
+      if (foco === 'sidebar') {
+        if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          setComandaFocoIdx((i) => Math.max(0, i - 1))
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          setComandaFocoIdx((i) => Math.min(comandasAbertas.length - 1, i + 1))
+        } else if (e.key === 'ArrowRight' || e.key === 'Escape') {
+          e.preventDefault()
+          setFoco('grid')
+        } else if (e.key === 'Enter') {
+          const alvo = comandasAbertas[comandaFocoIdx]
+          if (alvo) { e.preventDefault(); navigate(`/comanda/${alvo.id}`) }
+        }
+        return
+      }
+
+      if (foco === 'acoes') {
+        if (e.key === 'ArrowUp') { e.preventDefault(); setFoco('grid') }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); setAcaoFocoIdx(0) }
+        else if (e.key === 'ArrowRight') { e.preventDefault(); setAcaoFocoIdx(1) }
+        else if (e.key === 'Enter') {
+          e.preventDefault()
+          if (acaoFocoIdx === 0) { if (!acao && !bloqueado) cancelar() }
+          else if (!acao && comanda.itens.length > 0 && !bloqueado) setPagamentoModal(true)
+        }
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [algumModalAberto, comanda, foco, catFocoIdx, numCategorias, comandasAbertas, comandaFocoIdx, acaoFocoIdx, acao, bloqueado, id, navigate])
 
   if (loading) {
     return <div className="h-screen flex items-center justify-center text-slate-400 text-lg">Carregando…</div>
@@ -1111,17 +1198,21 @@ export default function Comanda() {
       {/* Header */}
       <header className="bg-brand text-white px-4 py-3 flex items-center gap-3 shadow-md flex-shrink-0">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <p className="font-bold text-xl leading-tight truncate">{nomeComanda(comanda)}</p>
-            {isAberta && (
-              <button
-                onClick={() => setEditarNome(true)}
-                className="text-blue-200 hover:text-white shrink-0 leading-none text-lg"
-                title="Editar nome"
-              >✎</button>
-            )}
-          </div>
-          <p className="text-sm text-blue-200">Comanda #{comanda.id}</p>
+          {isAberta ? (
+            <NomeClienteHeader
+              comanda={comanda}
+              editando={editandoNome}
+              onIniciarEdicao={setEditandoNome}
+              onSalvar={salvarNome}
+              nomeBtnRef={nomeBtnRef}
+              focado={foco === 'nome'}
+            />
+          ) : (
+            <p className="font-bold text-3xl leading-tight truncate">{nomeComanda(comanda)}</p>
+          )}
+          <p className="text-sm text-blue-200">
+            Comanda #{comanda.id} · {dataHoje.diaSemanaAbrev} {dataHoje.dataStr}
+          </p>
         </div>
         <div className="shrink-0"><SyncStatusBadge /></div>
         <div className="text-right shrink-0">
@@ -1138,7 +1229,13 @@ export default function Comanda() {
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar comandaAtualId={id} onNovaComanda={() => setShowNovaComanda(true)} />
+        <Sidebar
+          comandas={comandasAbertas}
+          comandaAtualId={id}
+          zonaAtiva={foco === 'sidebar'}
+          focoIdx={comandaFocoIdx}
+          onSelecionar={(cid) => navigate(`/comanda/${cid}`)}
+        />
 
         <main className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Badge de status */}
@@ -1153,7 +1250,19 @@ export default function Comanda() {
           )}
 
           {/* Formulário de adicionar */}
-          {isAberta && <AdicionarItemForm comanda={comanda} onAdicionado={adicionarItem} bloqueado={bloqueado} />}
+          {isAberta && (
+            <AdicionarItemForm
+              comanda={comanda}
+              onAdicionado={adicionarItem}
+              bloqueado={bloqueado}
+              ativo={foco === 'grid'}
+              catFocoIdx={catFocoIdx}
+              onCatsCarregadas={setNumCategorias}
+              onSelecionarCat={setCatFocoIdx}
+              showQuickAdd={showQuickAdd}
+              onShowQuickAdd={setShowQuickAdd}
+            />
+          )}
 
           {/* Total + lista de itens */}
           <div className="space-y-0">
@@ -1171,15 +1280,15 @@ export default function Comanda() {
                 comanda.itens.map((item) => (
                   <div key={item.id} className="flex items-center gap-3 px-4 py-3">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-800 text-base truncate">{item.descricao}</p>
-                      <p className="text-sm text-slate-500">
+                      <p className="font-semibold text-slate-800 text-lg truncate">{item.descricao}</p>
+                      <p className="text-base text-slate-500">
                         {tipoLabel(item.tipo)} · {displayQtd(item)}
                         {item.tipo !== 'KILO' && item.tipo !== 'KILO_BOLO' && item.tipo !== 'OUTROS'
                           ? ` × ${fmt(item.valorUnitario)}`
                           : ''}
                       </p>
                     </div>
-                    <span className="font-bold text-slate-700 shrink-0 text-base">{fmt(item.valorTotal)}</span>
+                    <span className="font-bold text-slate-700 shrink-0 text-lg">{fmt(item.valorTotal)}</span>
                     {isAberta && (
                       <button
                         onClick={() => removerItem(item.id)}
@@ -1198,14 +1307,18 @@ export default function Comanda() {
               <button
                 onClick={cancelar}
                 disabled={!!acao || bloqueado}
-                className="border-2 border-red-300 text-red-600 font-bold py-4 rounded-2xl text-base disabled:opacity-50 active:scale-95 transition-transform"
+                className={`border-2 border-red-300 text-red-600 font-bold py-4 rounded-2xl text-base disabled:opacity-50 active:scale-95 transition-transform ${
+                  foco === 'acoes' && acaoFocoIdx === 0 ? 'ring-4 ring-red-200' : ''
+                }`}
               >
                 {acao === 'cancelando' ? 'Cancelando…' : 'Cancelar'}
               </button>
               <button
                 onClick={() => setPagamentoModal(true)}
                 disabled={!!acao || comanda.itens.length === 0 || bloqueado}
-                className="bg-emerald-500 text-white font-bold py-4 rounded-2xl text-base disabled:opacity-50 active:scale-95 transition-transform shadow-md"
+                className={`bg-emerald-500 text-white font-bold py-4 rounded-2xl text-base disabled:opacity-50 active:scale-95 transition-transform shadow-md ${
+                  foco === 'acoes' && acaoFocoIdx === 1 ? 'ring-4 ring-emerald-300' : ''
+                }`}
               >
                 {acao === 'finalizando' ? 'Finalizando…' : 'Finalizar'}
               </button>
@@ -1230,16 +1343,6 @@ export default function Comanda() {
           total={comanda.total}
           onClose={() => setPagamentoModal(false)}
           onConfirmar={finalizar}
-        />
-      )}
-      {showNovaComanda && (
-        <NovaComandaModal onClose={() => setShowNovaComanda(false)} onCreate={handleCriada} />
-      )}
-      {editarNome && (
-        <EditarNomeModal
-          nomeAtual={comanda.clienteNome}
-          onClose={() => setEditarNome(false)}
-          onSalvar={salvarNome}
         />
       )}
     </div>

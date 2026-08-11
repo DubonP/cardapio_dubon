@@ -371,67 +371,10 @@ function MovimentacaoModal({ onClose, onRegistrada }) {
   )
 }
 
-// ─── Modal Nova Comanda ──────────────────────────────────────────────────────
-function NovaComandaModal({ onClose, onCreate }) {
-  const [nome, setNome] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [erro, setErro] = useState('')
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setErro('')
-    setLoading(true)
-    try {
-      const data = await ops.criarComanda({ clienteNome: nome.trim() })
-      onCreate(data)
-    } catch (err) {
-      setErro(err.response?.data?.error || 'Erro ao criar comanda')
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-        <h2 className="text-xl font-bold text-slate-800 mb-1">Nova Comanda</h2>
-        <p className="text-sm text-slate-400 mb-4">Nome do cliente é opcional</p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="text"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-            placeholder="Nome do cliente (opcional)"
-            className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand"
-            autoFocus
-          />
-          {erro && <p className="text-red-600 text-sm">{erro}</p>}
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 border border-slate-300 text-slate-700 font-semibold py-3 rounded-xl"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-brand text-white font-semibold py-3 rounded-xl disabled:opacity-50"
-            >
-              {loading ? 'Criando…' : 'Abrir'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
 // ─── Componente principal ────────────────────────────────────────────────────
 export default function PDV() {
   const [comandas, setComandas] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showNovaComanda, setShowNovaComanda] = useState(false)
   const [showAbrirCaixa, setShowAbrirCaixa] = useState(false)
   const [showFecharCaixa, setShowFecharCaixa] = useState(false)
   const [showMovimentacao, setShowMovimentacao] = useState(false)
@@ -447,6 +390,7 @@ export default function PDV() {
       const data = await ops.carregarCaixaHoje()
       setCaixa(data.caixa)
       setNaoFechado(data.naoFechado)
+      if (data.caixa?.status === 'ABERTO') ops.garantirComandaReserva()
     } catch {
       // silent
     } finally {
@@ -471,25 +415,6 @@ export default function PDV() {
     const interval = setInterval(carregarComandas, 15000)
     return () => clearInterval(interval)
   }, [carregarCaixa, carregarComandas])
-
-  useEffect(() => {
-    function onKey(e) {
-      if (e.key !== 'Enter') return
-      const tag = document.activeElement?.tagName?.toLowerCase()
-      if (['input', 'textarea', 'select', 'button'].includes(tag)) return
-      if (caixa?.status === 'ABERTO' && !showNovaComanda && !showAbrirCaixa && !showFecharCaixa && !showMovimentacao) {
-        e.preventDefault()
-        setShowNovaComanda(true)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [caixa, showNovaComanda, showAbrirCaixa, showFecharCaixa, showMovimentacao])
-
-  function handleCriada(comanda) {
-    setShowNovaComanda(false)
-    navigate(`/comanda/${comanda.id}`)
-  }
 
   function sair() {
     if (!window.confirm('Sair do PDV?')) return
@@ -610,15 +535,6 @@ export default function PDV() {
           </div>
         )}
 
-        {/* Nova comanda */}
-        <button
-          onClick={() => caixaAberto && setShowNovaComanda(true)}
-          disabled={!caixaAberto || bloqueado}
-          className="w-full bg-brand text-white font-bold text-lg py-4 rounded-2xl shadow-md mb-5 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-40 disabled:active:scale-100"
-        >
-          <span className="text-2xl">+</span> Nova Comanda
-        </button>
-
         {/* Movimentações do dia */}
         {caixaAberto && caixa?.movimentacoes?.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-4">
@@ -644,7 +560,7 @@ export default function PDV() {
             <div className="text-5xl mb-3">📋</div>
             <p className="font-medium">Nenhuma comanda aberta</p>
             <p className="text-sm mt-1">
-              {caixaAberto ? 'Toque em "Nova Comanda" para começar' : 'Abra o caixa para criar comandas'}
+              {caixaAberto ? 'Aguarde, a comanda vazia está sendo criada…' : 'Abra o caixa para criar comandas'}
             </p>
           </div>
         ) : (
@@ -679,14 +595,16 @@ export default function PDV() {
       </main>
 
       {/* Modals */}
-      {showNovaComanda && (
-        <NovaComandaModal onClose={() => setShowNovaComanda(false)} onCreate={handleCriada} />
-      )}
       {showAbrirCaixa && (
         <AbrirCaixaModal
           naoFechado={naoFechado}
           onClose={() => setShowAbrirCaixa(false)}
-          onAberto={(c) => { setCaixa(c); setNaoFechado(null); setShowAbrirCaixa(false) }}
+          onAberto={(c) => {
+            setCaixa(c)
+            setNaoFechado(null)
+            setShowAbrirCaixa(false)
+            ops.garantirComandaReserva()
+          }}
         />
       )}
       {showFecharCaixa && (

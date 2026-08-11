@@ -128,8 +128,33 @@ export async function criarComanda({ clienteNome } = {}) {
   })
 }
 
+// Comanda "reserva": sem nome e sem itens — sempre deve existir uma
+// disponível enquanto o caixa está aberto, pronta pro próximo cliente.
+export function ehReserva(comanda) {
+  return (!comanda?.clienteNome || comanda.clienteNome === '—') && (comanda?.itens?.length || 0) === 0
+}
+
+let garantindoReserva = false
+
+export async function garantirComandaReserva() {
+  if (garantindoReserva) return
+  garantindoReserva = true
+  try {
+    const comandas = await listarComandas()
+    if (!comandas.some(ehReserva)) {
+      await criarComanda()
+    }
+  } catch (err) {
+    // não interrompe o fluxo principal (ex: salvar nome, adicionar item),
+    // mas registra pra dar pra diagnosticar — normalmente é caixa fechado.
+    console.warn('[garantirComandaReserva] não conseguiu garantir a reserva:', err.response?.data?.error || err.message)
+  } finally {
+    garantindoReserva = false
+  }
+}
+
 export async function adicionarItem(comandaId, item) {
-  return comEscritaOffline({
+  const resultado = await comEscritaOffline({
     tentar: async () => {
       const { data } = await api.post(`/api/pdv/comandas/${comandaId}/itens`, item, { timeout: TIMEOUT_MS })
       await db.salvarComandaLocal({ ...data, localId: String(data.id) })
@@ -151,6 +176,8 @@ export async function adicionarItem(comandaId, item) {
       return atualizada
     },
   })
+  garantirComandaReserva()
+  return resultado
 }
 
 export async function removerItem(comandaId, itemId) {
@@ -178,7 +205,7 @@ export async function removerItem(comandaId, itemId) {
 }
 
 export async function salvarNome(comandaId, novoNome) {
-  return comEscritaOffline({
+  const resultado = await comEscritaOffline({
     tentar: async () => {
       const { data } = await api.patch(`/api/pdv/comandas/${comandaId}/nome`, { clienteNome: novoNome }, { timeout: TIMEOUT_MS })
       await db.salvarComandaLocal({ ...data, localId: String(data.id) })
@@ -193,6 +220,8 @@ export async function salvarNome(comandaId, novoNome) {
       return atualizada
     },
   })
+  garantirComandaReserva()
+  return resultado
 }
 
 export async function finalizarComanda(comandaId, { formaPagamento, pagamentos }) {
