@@ -263,6 +263,9 @@ function ColunaBandeira({ col, admin, podeEditar, onAdicionar, onEditar, onRemov
   const [salvandoSlot, setSalvandoSlot] = useState([false, false])
   const vendaInputRefs = useRef([])
   const slotRefs = useRef([])
+  // Enter chama confirmarSlot e já troca o foco; isso dispara um blur "de verdade"
+  // no campo que perdeu o foco — essa flag avisa o onBlur pra não salvar de novo.
+  const enterSlotRef = useRef([false, false])
 
   async function confirmarSlot(idx) {
     const v = parseFloat(String(slots[idx]).replace(',', '.'))
@@ -325,10 +328,14 @@ function ColunaBandeira({ col, admin, podeEditar, onAdicionar, onEditar, onRemov
             value={valor}
             disabled={salvandoSlot[idx]}
             onChange={(e) => setSlots((s) => { const n = [...s]; n[idx] = e.target.value; return n })}
-            onBlur={() => confirmarSlot(idx)}
+            onBlur={() => {
+              if (enterSlotRef.current[idx]) { enterSlotRef.current[idx] = false; return }
+              confirmarSlot(idx)
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
+                enterSlotRef.current[idx] = true
                 confirmarSlot(idx)
                 focarOutroSlot(idx)
               }
@@ -374,6 +381,9 @@ function ColunaBandeira({ col, admin, podeEditar, onAdicionar, onEditar, onRemov
 function VendaInput({ valor, onSalvar, onRemover, somenteLeitura, inputRef, onEnterFoco }) {
   const [v, setV] = useState(String(valor))
   const [salvando, setSalvando] = useState(false)
+  // mesma lógica do slot: Enter já confirma e troca o foco; a flag evita que o
+  // blur disparado por essa troca de foco acabe salvando o mesmo valor de novo.
+  const enterRef = useRef(false)
 
   async function confirmar() {
     const num = parseFloat(String(v).replace(',', '.'))
@@ -397,10 +407,14 @@ function VendaInput({ valor, onSalvar, onRemover, somenteLeitura, inputRef, onEn
         value={v}
         disabled={salvando}
         onChange={(e) => setV(e.target.value)}
-        onBlur={confirmar}
+        onBlur={() => {
+          if (enterRef.current) { enterRef.current = false; return }
+          confirmar()
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault()
+            enterRef.current = true
             confirmar()
             onEnterFoco?.()
           }
