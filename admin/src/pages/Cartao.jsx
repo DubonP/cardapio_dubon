@@ -282,7 +282,12 @@ function ColunaBandeira({ col, admin, podeEditar, onAdicionar, onEditar, onRemov
     <div className={`bg-white rounded-2xl shadow-sm border-2 p-3 flex flex-col gap-2 ${statusStyle}`}>
       <div className="text-center">
         <div className="font-bold text-gray-800 text-sm">{col.nome}</div>
-        <div className="text-xs text-gray-400">{TIPO_LABEL[col.tipo]}{admin ? ` · ${col.taxa}%` : ''}</div>
+        <div className="text-xs">
+          <span className={col.tipo === 'CREDITO' ? 'text-orange-500 font-semibold' : 'text-blue-500 font-semibold'}>
+            {TIPO_LABEL[col.tipo]}
+          </span>
+          {admin && <span className="text-gray-400"> · {col.taxa}%</span>}
+        </div>
       </div>
 
       <div className="space-y-1 flex-1">
@@ -314,7 +319,12 @@ function ColunaBandeira({ col, admin, podeEditar, onAdicionar, onEditar, onRemov
 
       {admin && (
         <>
-          <div className="text-center font-bold text-gray-700 border-t pt-2">{fmt(col.total)}</div>
+          <div className="text-center border-t pt-2">
+            <div className="font-bold text-gray-700">{fmt(col.total)}</div>
+            <div className="text-xs text-gray-400">
+              -{fmt(col.taxaValor)} taxa · <span className="text-emerald-600 font-semibold">líq. {fmt(col.liquido)}</span>
+            </div>
+          </div>
           <div className="flex gap-1">
             <button
               onClick={() => onStatus(col.status === 'CORRETO' ? 'PENDENTE' : 'CORRETO')}
