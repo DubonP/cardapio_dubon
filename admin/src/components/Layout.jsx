@@ -6,6 +6,7 @@ const NAV = [
   { to: '/pedidos',       icon: '📋', label: 'Pedidos',      adminOnly: false },
   { to: '/cardapio',      icon: '🍦', label: 'Cardápio',     adminOnly: false },
   { to: '/entregadores',  icon: '🛵', label: 'Entregadores', adminOnly: false },
+  { to: '/cartao',        icon: '💳', label: 'Cartão',       adminOnly: false },
   { to: '/balcao',        icon: '🏪', label: 'Balcão',       adminOnly: true  },
   { to: '/caixa',         icon: '💰', label: 'Caixa',        adminOnly: true  },
   { to: '/configuracoes', icon: '⚙️', label: 'Config.',      adminOnly: true  },

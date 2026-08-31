@@ -9,6 +9,7 @@ import Configuracoes from './pages/Configuracoes'
 import Relatorios from './pages/Relatorios'
 import Balcao from './pages/Balcao'
 import Caixa from './pages/Caixa'
+import Cartao from './pages/Cartao'
 import { isAdmin } from './lib/auth'
 
 function RequireAdmin() {
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/pedidos" element={<Pedidos />} />
             <Route path="/cardapio" element={<Cardapio />} />
             <Route path="/entregadores" element={<Entregadores />} />
+            <Route path="/cartao" element={<Cartao />} />
             <Route element={<RequireAdmin />}>
               <Route path="/balcao" element={<Balcao />} />
               <Route path="/caixa" element={<Caixa />} />
