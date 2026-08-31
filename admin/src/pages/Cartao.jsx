@@ -49,15 +49,18 @@ export default function Cartao() {
   const dentroDaJanela = data >= limite && data <= hoje
   const podeEditar = admin || dentroDaJanela
 
-  const carregarDia = useCallback(async () => {
-    setLoading(true)
+  // silencioso=true (usado depois de salvar/editar/remover uma venda) não mexe
+  // no "loading" — evita o piscar de "Carregando…" que desmontava a grade
+  // inteira a cada lançamento e derrubava o foco do campo seguinte.
+  const carregarDia = useCallback(async (silencioso = false) => {
+    if (!silencioso) setLoading(true)
     try {
       const { data: resp } = await api.get('/api/admin/cartao/dia', { params: { data } })
       setDia(resp)
     } catch {
       setDia({ colunas: [] })
     } finally {
-      setLoading(false)
+      if (!silencioso) setLoading(false)
     }
   }, [data])
 
@@ -82,22 +85,22 @@ export default function Cartao() {
 
   async function adicionarVenda(bandeiraId, valor) {
     await api.post(`/api/admin/cartao/dia/${bandeiraId}/vendas`, { valor }, { params: { data } })
-    await carregarDia()
+    await carregarDia(true)
   }
 
   async function editarVenda(vendaId, valor) {
     await api.patch(`/api/admin/cartao/vendas/${vendaId}`, { valor })
-    await carregarDia()
+    await carregarDia(true)
   }
 
   async function removerVenda(vendaId) {
     await api.delete(`/api/admin/cartao/vendas/${vendaId}`)
-    await carregarDia()
+    await carregarDia(true)
   }
 
   async function mudarStatus(bandeiraId, status) {
     await api.patch(`/api/admin/cartao/dia/${bandeiraId}/status`, { status }, { params: { data } })
-    await carregarDia()
+    await carregarDia(true)
     await carregarPendencias()
   }
 
