@@ -257,19 +257,31 @@ export default function Cartao() {
 }
 
 function ColunaBandeira({ col, admin, podeEditar, onAdicionar, onEditar, onRemover, onStatus }) {
-  const [novoValor, setNovoValor] = useState('')
-  const [salvando, setSalvando] = useState(false)
+  // 2 campos "novo valor" sempre abertos, alternando o foco entre eles no Enter
+  // — assim dá pra digitar vários lançamentos seguidos sem esperar o servidor nem clicar de novo.
+  const [slots, setSlots] = useState(['', ''])
+  const [salvandoSlot, setSalvandoSlot] = useState([false, false])
+  const vendaInputRefs = useRef([])
+  const slotRefs = useRef([])
 
-  async function confirmarNovo() {
-    const v = parseFloat(novoValor.replace(',', '.'))
-    if (!v || v <= 0) { setNovoValor(''); return }
-    setSalvando(true)
+  async function confirmarSlot(idx) {
+    const v = parseFloat(String(slots[idx]).replace(',', '.'))
+    if (!v || v <= 0) return
+    setSlots((s) => { const n = [...s]; n[idx] = ''; return n })
+    setSalvandoSlot((s) => { const n = [...s]; n[idx] = true; return n })
     try {
       await onAdicionar(v)
-      setNovoValor('')
     } finally {
-      setSalvando(false)
+      setSalvandoSlot((s) => { const n = [...s]; n[idx] = false; return n })
     }
+  }
+
+  function focarProximaVenda(i) {
+    (vendaInputRefs.current[i + 1] || slotRefs.current[0])?.focus()
+  }
+
+  function focarOutroSlot(idx) {
+    slotRefs.current[idx === 0 ? 1 : 0]?.focus()
   }
 
   const statusStyle = {
@@ -291,30 +303,40 @@ function ColunaBandeira({ col, admin, podeEditar, onAdicionar, onEditar, onRemov
       </div>
 
       <div className="space-y-1 flex-1">
-        {col.vendas.map((v) => (
+        {col.vendas.map((v, i) => (
           <VendaInput
             key={v.id}
             valor={v.valor}
             onSalvar={(novo) => onEditar(v.id, novo)}
             onRemover={() => onRemover(v.id)}
             somenteLeitura={!podeEditar}
+            inputRef={(el) => { vendaInputRefs.current[i] = el }}
+            onEnterFoco={() => focarProximaVenda(i)}
           />
         ))}
-        {podeEditar && (
+        {podeEditar && slots.map((valor, idx) => (
           <input
+            key={idx}
+            ref={(el) => { slotRefs.current[idx] = el }}
             type="number"
             inputMode="decimal"
             min="0"
             step="0.01"
-            value={novoValor}
-            disabled={salvando}
-            onChange={(e) => setNovoValor(e.target.value)}
-            onBlur={confirmarNovo}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur() } }}
+            value={valor}
+            disabled={salvandoSlot[idx]}
+            onChange={(e) => setSlots((s) => { const n = [...s]; n[idx] = e.target.value; return n })}
+            onBlur={() => confirmarSlot(idx)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                confirmarSlot(idx)
+                focarOutroSlot(idx)
+              }
+            }}
             placeholder="+ valor"
             className="w-full border border-dashed border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-brand"
           />
-        )}
+        ))}
       </div>
 
       {admin && (
@@ -349,7 +371,7 @@ function ColunaBandeira({ col, admin, podeEditar, onAdicionar, onEditar, onRemov
   )
 }
 
-function VendaInput({ valor, onSalvar, onRemover, somenteLeitura }) {
+function VendaInput({ valor, onSalvar, onRemover, somenteLeitura, inputRef, onEnterFoco }) {
   const [v, setV] = useState(String(valor))
   const [salvando, setSalvando] = useState(false)
 
@@ -367,6 +389,7 @@ function VendaInput({ valor, onSalvar, onRemover, somenteLeitura }) {
   return (
     <div className="flex items-center gap-1">
       <input
+        ref={inputRef}
         type="number"
         inputMode="decimal"
         min="0"
@@ -375,7 +398,13 @@ function VendaInput({ valor, onSalvar, onRemover, somenteLeitura }) {
         disabled={salvando}
         onChange={(e) => setV(e.target.value)}
         onBlur={confirmar}
-        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur() } }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            confirmar()
+            onEnterFoco?.()
+          }
+        }}
         className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-brand"
       />
       <button onClick={onRemover} className="text-gray-300 hover:text-red-400 text-lg leading-none px-1">×</button>
