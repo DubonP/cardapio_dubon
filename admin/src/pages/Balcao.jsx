@@ -1,7 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../lib/api'
+import Modal from '../components/Modal'
 
 const fmt = (v) => 'R$ ' + Number(v ?? 0).toFixed(2).replace('.', ',')
+// Destaque visual pra achar erro de digitação rápido (ex: 2875 em vez de 28,75).
+const LIMITE_DESTAQUE = 500
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      {children}
+    </div>
+  )
+}
 
 const PERIODOS = [
   { key: 'dia',    label: 'Hoje' },
@@ -60,14 +72,12 @@ function StatCard({ label, value, icon }) {
   )
 }
 
-function ComandaRow({ comanda, onToggle, expanded }) {
+function ComandaRow({ comanda, onToggle, expanded, onEditarItem, onRemoverItem, onRemoverComanda }) {
+  const totalAlto = Number(comanda.total) >= LIMITE_DESTAQUE
   return (
     <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50 transition-colors"
-      >
-        <div className="flex-1 min-w-0">
+      <div className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors">
+        <button onClick={onToggle} className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-gray-800 truncate">{nomeComanda(comanda)}</span>
             <StatusBadge status={comanda.status} />
@@ -82,28 +92,111 @@ function ComandaRow({ comanda, onToggle, expanded }) {
               <span className="ml-2 text-gray-500">{pagamentoLabel(comanda.formaPagamento)}</span>
             )}
           </p>
-        </div>
-        <div className="text-right shrink-0">
-          <p className="font-bold text-gray-800">{fmt(comanda.total)}</p>
+        </button>
+        <button onClick={onToggle} className="text-right shrink-0">
+          <p className={`font-bold ${totalAlto ? 'text-emerald-600' : 'text-gray-800'}`}>{fmt(comanda.total)}</p>
           <span className="text-gray-300 text-sm">{expanded ? '▲' : '▼'}</span>
-        </div>
-      </button>
+        </button>
+        <button
+          onClick={() => onRemoverComanda(comanda.id)}
+          title="Excluir comanda inteira"
+          className="text-gray-300 hover:text-red-400 p-1 shrink-0"
+        >
+          🗑️
+        </button>
+      </div>
 
       {expanded && comanda.itens.length > 0 && (
         <div className="border-t divide-y divide-gray-50 bg-gray-50">
-          {comanda.itens.map((item) => (
-            <div key={item.id} className="px-4 py-2 flex items-center gap-2 text-sm">
-              <span className="text-xs bg-white border rounded px-1.5 py-0.5 text-gray-500 shrink-0">
-                {tipoLabel(item.tipo)}
-              </span>
-              <span className="flex-1 text-gray-700 truncate">{item.descricao}</span>
-              <span className="text-gray-400 shrink-0">{displayQtd(item)}</span>
-              <span className="font-medium text-gray-700 shrink-0">{fmt(item.valorTotal)}</span>
-            </div>
-          ))}
+          {comanda.itens.map((item) => {
+            const itemAlto = Number(item.valorTotal) >= LIMITE_DESTAQUE
+            return (
+              <div key={item.id} className="px-4 py-2 flex items-center gap-2 text-sm">
+                <span className="text-xs bg-white border rounded px-1.5 py-0.5 text-gray-500 shrink-0">
+                  {tipoLabel(item.tipo)}
+                </span>
+                <span className="flex-1 text-gray-700 truncate">{item.descricao}</span>
+                <span className="text-gray-400 shrink-0">{displayQtd(item)}</span>
+                <span className={`font-medium shrink-0 ${itemAlto ? 'text-emerald-600 font-bold' : 'text-gray-700'}`}>
+                  {fmt(item.valorTotal)}
+                </span>
+                <button onClick={() => onEditarItem(item)} className="text-gray-300 hover:text-gray-600 p-1 shrink-0">✏️</button>
+                <button onClick={() => onRemoverItem(item.id)} className="text-gray-300 hover:text-red-400 p-1 shrink-0">🗑️</button>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
+  )
+}
+
+function ItemEditModal({ item, onClose, onSave }) {
+  const [form, setForm] = useState({
+    descricao: item.descricao,
+    quantidade: String(item.quantidade),
+    valorUnitario: String(item.valorUnitario),
+  })
+  const [saving, setSaving] = useState(false)
+  const [erro, setErro] = useState('')
+
+  function set(k, v) { setForm((f) => ({ ...f, [k]: v })) }
+
+  const semMultiplicar = ['KILO', 'KILO_BOLO', 'OUTROS'].includes(item.tipo)
+  const qtdNum = parseFloat(String(form.quantidade).replace(',', '.')) || 0
+  const valorNum = parseFloat(String(form.valorUnitario).replace(',', '.')) || 0
+  const previewTotal = semMultiplicar ? valorNum : valorNum * qtdNum
+
+  async function salvar() {
+    setErro('')
+    if (!form.descricao.trim()) { setErro('Informe a descrição'); return }
+    if (!qtdNum || qtdNum <= 0) { setErro('Quantidade inválida'); return }
+    if (!valorNum || valorNum <= 0) { setErro('Valor inválido'); return }
+    setSaving(true)
+    try {
+      await onSave(item.id, { descricao: form.descricao.trim(), quantidade: qtdNum, valorUnitario: valorNum })
+      onClose()
+    } catch (err) {
+      setErro(err.response?.data?.error || 'Erro ao salvar')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal
+      title="Editar item"
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancelar</button>
+          <button
+            onClick={salvar}
+            disabled={saving}
+            className="px-4 py-2 text-sm bg-brand text-white rounded-lg font-medium disabled:opacity-50"
+          >
+            {saving ? 'Salvando…' : 'Salvar'}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Field label="Descrição">
+          <input className="input" value={form.descricao} onChange={(e) => set('descricao', e.target.value)} autoFocus />
+        </Field>
+        {!semMultiplicar && (
+          <Field label="Quantidade">
+            <input className="input" type="number" min="0" step="1" value={form.quantidade} onChange={(e) => set('quantidade', e.target.value)} />
+          </Field>
+        )}
+        <Field label={semMultiplicar ? 'Valor total (R$)' : 'Valor unitário (R$)'}>
+          <input className="input" type="number" min="0" step="0.01" value={form.valorUnitario} onChange={(e) => set('valorUnitario', e.target.value)} />
+        </Field>
+        <p className="text-sm text-gray-500">
+          Total do item: <span className="font-bold text-gray-800">{fmt(previewTotal)}</span>
+        </p>
+        {erro && <p className="text-red-600 text-sm">{erro}</p>}
+      </div>
+    </Modal>
   )
 }
 
@@ -119,6 +212,7 @@ export default function Balcao() {
 
   const [expanded, setExpanded] = useState(null)
   const [err, setErr] = useState('')
+  const [itemEditando, setItemEditando] = useState(null)
 
   const loadStats = useCallback(async () => {
     setLoadingStats(true)
@@ -152,6 +246,44 @@ export default function Balcao() {
 
   function toggleExpanded(id) {
     setExpanded((prev) => (prev === id ? null : id))
+  }
+
+  async function salvarItem(itemId, dados) {
+    const { data } = await api.patch(`/api/admin/balcao/itens/${itemId}`, dados)
+    setListData((prev) => ({
+      ...prev,
+      comandas: prev.comandas.map((c) => (c.id === data.id ? data : c)),
+    }))
+    loadStats()
+  }
+
+  async function removerItem(itemId) {
+    if (!window.confirm('Remover este item da comanda?')) return
+    try {
+      const { data } = await api.delete(`/api/admin/balcao/itens/${itemId}`)
+      setListData((prev) => ({
+        ...prev,
+        comandas: prev.comandas.map((c) => (c.id === data.id ? data : c)),
+      }))
+      loadStats()
+    } catch {
+      setErr('Erro ao remover item')
+    }
+  }
+
+  async function removerComanda(comandaId) {
+    if (!window.confirm('Excluir esta comanda inteira? Essa ação não pode ser desfeita.')) return
+    try {
+      await api.delete(`/api/admin/balcao/comandas/${comandaId}`)
+      setListData((prev) => ({
+        ...prev,
+        comandas: prev.comandas.filter((c) => c.id !== comandaId),
+        total: prev.total - 1,
+      }))
+      loadStats()
+    } catch {
+      setErr('Erro ao remover comanda')
+    }
   }
 
   return (
@@ -239,6 +371,9 @@ export default function Balcao() {
                 comanda={c}
                 expanded={expanded === c.id}
                 onToggle={() => toggleExpanded(c.id)}
+                onEditarItem={setItemEditando}
+                onRemoverItem={removerItem}
+                onRemoverComanda={removerComanda}
               />
             ))}
           </div>
@@ -263,6 +398,14 @@ export default function Balcao() {
             </div>
           )}
         </>
+      )}
+
+      {itemEditando && (
+        <ItemEditModal
+          item={itemEditando}
+          onClose={() => setItemEditando(null)}
+          onSave={salvarItem}
+        />
       )}
     </div>
   )
