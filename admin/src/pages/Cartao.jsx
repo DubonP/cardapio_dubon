@@ -4,7 +4,8 @@ import Modal from '../components/Modal'
 import { isAdmin } from '../lib/auth'
 
 const fmt = (v) => 'R$ ' + Number(v).toFixed(2).replace('.', ',')
-const TIPO_LABEL = { CREDITO: 'Crédito', DEBITO: 'Débito' }
+const TIPO_LABEL = { CREDITO: 'Crédito', DEBITO: 'Débito', PIX: 'Pix' }
+const TIPO_COLOR = { CREDITO: 'text-orange-500', DEBITO: 'text-blue-500', PIX: 'text-emerald-500' }
 
 function hojeISO() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
@@ -301,7 +302,7 @@ function ColunaBandeira({ col, admin, podeEditar, onAdicionar, onEditar, onRemov
       <div className="text-center">
         <div className="font-bold text-gray-800 text-sm">{col.nome}</div>
         <div className="text-xs">
-          <span className={col.tipo === 'CREDITO' ? 'text-orange-500 font-semibold' : 'text-blue-500 font-semibold'}>
+          <span className={`${TIPO_COLOR[col.tipo]} font-semibold`}>
             {TIPO_LABEL[col.tipo]}
           </span>
           {admin && <span className="text-gray-400"> · {col.taxa}%</span>}
@@ -482,6 +483,7 @@ function BandeiraFormModal({ mode, initial, onClose, onSave }) {
             <select className="input" value={form.tipo} onChange={(e) => set('tipo', e.target.value)}>
               <option value="CREDITO">Crédito</option>
               <option value="DEBITO">Débito</option>
+              <option value="PIX">Pix</option>
             </select>
           </Field>
         )}
