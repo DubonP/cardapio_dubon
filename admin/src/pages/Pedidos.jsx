@@ -40,16 +40,39 @@ const STATUS = {
 
 const PAG = { DINHEIRO: '💵 Dinheiro', MAQUINA: '💳 Cartão/QR', PIX: '📱 Pix' }
 
-// Ordem de exibição na lista principal: sem flag > saiu > impresso > avisado > finalizado > cancelado
-const GRUPO_ORDEM = ['none', 'saiu', 'impresso', 'avisado', 'finalizado', 'cancelado']
-
-function grupoPedido(p) {
+// Status "visual" de cada pedido — mesma prioridade usada pro fundo do card:
+// cancelado > finalizado > saiu > impresso > avisado > pago > sem flag
+function statusPedido(p) {
   if (p.status === 'CANCELADO') return 'cancelado'
   if (p.finalizado) return 'finalizado'
   if (p.saiuEntrega) return 'saiu'
   if (p.impresso) return 'impresso'
   if (p.avisado) return 'avisado'
+  if (p.pago) return 'pago'
   return 'none'
+}
+
+// Cores por status — usadas no fundo do card, na marca d'água e no atalho lateral
+const STATUS_COR = {
+  cancelado:  { card: 'bg-gray-200 border-gray-400',    wm: 'CANCELADO',  wmColor: '#374151', side: 'bg-gray-100 border-gray-400 text-gray-600' },
+  finalizado: { card: 'bg-red-200 border-red-600',      wm: 'FINALIZADO', wmColor: '#b91c1c', side: 'bg-red-50 border-red-500 text-red-700' },
+  saiu:       { card: 'bg-green-200 border-green-600',  wm: 'SAIU',       wmColor: '#15803d', side: 'bg-green-50 border-green-500 text-green-700' },
+  impresso:   { card: 'bg-blue-200 border-blue-600',    wm: 'IMPRESSO',   wmColor: '#1d4ed8', side: 'bg-blue-50 border-blue-500 text-blue-700' },
+  avisado:    { card: 'bg-purple-200 border-purple-600',wm: 'AVISADO',    wmColor: '#7e22ce', side: 'bg-purple-50 border-purple-500 text-purple-700' },
+  pago:       { card: 'bg-amber-200 border-amber-600',  wm: 'PAGO',       wmColor: '#b45309', side: 'bg-amber-50 border-amber-500 text-amber-700' },
+  none:       { card: 'bg-white border-gray-200',       wm: null,         side: 'bg-white border-gray-200 text-gray-600' },
+}
+
+function corLateral(p) {
+  return STATUS_COR[statusPedido(p)].side
+}
+
+// Ordem de exibição na lista principal: sem flag/pago > saiu > impresso > avisado > finalizado > cancelado
+const GRUPO_ORDEM = ['none', 'pago', 'saiu', 'impresso', 'avisado', 'finalizado', 'cancelado']
+
+function grupoPedido(p) {
+  const s = statusPedido(p)
+  return s === 'pago' ? 'none' : s
 }
 
 function ordenarPedidos(lista) {
@@ -426,14 +449,14 @@ export default function Pedidos() {
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">
             Pedidos do dia
           </h2>
-          <ul className="space-y-0.5">
+          <ul className="space-y-1">
             {pedidosSidebar.map((p) => (
               <li key={p.id}>
                 <button
                   onClick={() => scrollToPedido(p.id)}
-                  className="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 truncate"
+                  className={`w-full text-left text-sm px-2 py-1.5 rounded-lg border-2 font-medium truncate hover:brightness-95 ${corLateral(p)}`}
                 >
-                  <span className="font-semibold text-brand">{p.numeroDia}</span>
+                  <span className="font-bold">{p.numeroDia}</span>
                   {' - '}
                   {p.clienteNome || '—'}
                 </button>
@@ -738,16 +761,8 @@ function PedidoCard({ pedido: p, highlighted, onFlag, onStatus, onPagamentoParci
   const parcialVal = Number(p.pagamentoParcial || 0)
   const restante = Math.max(0, Number(p.total) - parcialVal)
 
-  // Priority: cancelado > finalizado > saiu > impresso > avisado > pago > default
-  const cardStyle = (() => {
-    if (isCanceled)    return { bg: 'bg-gray-200 border-gray-400', wm: 'CANCELADO', wmColor: '#374151' }
-    if (p.finalizado)  return { bg: 'bg-red-200 border-red-600', wm: 'FINALIZADO', wmColor: '#b91c1c' }
-    if (p.saiuEntrega) return { bg: 'bg-green-200 border-green-600', wm: 'SAIU', wmColor: '#15803d' }
-    if (p.impresso)    return { bg: 'bg-blue-200 border-blue-600', wm: 'IMPRESSO', wmColor: '#1d4ed8' }
-    if (p.avisado)     return { bg: 'bg-purple-200 border-purple-600', wm: 'AVISADO', wmColor: '#7e22ce' }
-    if (p.pago)        return { bg: 'bg-amber-200 border-amber-600', wm: 'PAGO', wmColor: '#b45309' }
-    return { bg: 'bg-white border-gray-200', wm: null }
-  })()
+  const corStatus = STATUS_COR[statusPedido(p)]
+  const cardStyle = { bg: corStatus.card, wm: corStatus.wm, wmColor: corStatus.wmColor }
 
   const handleCancelToggle = (e) => {
     e.preventDefault()
