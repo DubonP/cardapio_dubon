@@ -140,7 +140,6 @@ body{font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:bold
 .sec{margin-top:4px}
 </style></head><body>
 <div class="center bold" style="font-size:32px;line-height:1.1">#${pedido.numeroDia}</div>
-${pedido.pago ? `<div class="center bold" style="font-size:12px;margin-top:1px">✔ PAGO</div>` : ''}
 <div class="center bold" style="font-size:14px;margin-top:2px">SORVETERIA DUBON</div>
 ${pedido.clienteNome ? `<div class="center bold">Cliente: ${pedido.clienteNome}</div>` : ''}
 <div class="center">${dt}</div>
@@ -153,8 +152,11 @@ ${parcialHTML}
 ${enderecoHTML}
 <div class="div"></div>
 <div class="row bold" style="font-size:17px"><span>TOTAL</span><span>${fmt(pedido.total)}</span></div>
-<div class="center bold" style="font-size:15px;margin-top:2px">${pagLabel[pedido.formaPagamento] || pedido.formaPagamento}</div>
-${pedido.trocoPara ? `<div class="center" style="font-size:11px">Troco para: ${fmt(pedido.trocoPara)}</div>` : ''}
+${pedido.pago
+  ? `<div class="center bold" style="font-size:22px;margin-top:2px">✔ PAGO</div>`
+  : `<div class="center bold" style="font-size:15px;margin-top:2px">${pagLabel[pedido.formaPagamento] || pedido.formaPagamento}</div>
+     ${pedido.trocoPara ? `<div class="center" style="font-size:11px">Troco para: ${fmt(pedido.trocoPara)}</div>` : ''}`
+}
 </body></html>`
 }
 
@@ -1012,7 +1014,6 @@ function gerarReciboTexto(p) {
     center(`#${p.numeroDia}`),
     line,
   ]
-  if (p.pago) lines.push(center('✔ PAGO'))
   lines.push(center('SORVETERIA DUBON'))
   if (p.clienteNome) lines.push(center(`Cliente: ${p.clienteNome}`))
   lines.push(center(dt))
@@ -1055,9 +1056,13 @@ function gerarReciboTexto(p) {
 
   lines.push(line)
   lines.push(rowLR('TOTAL:', fmt(p.total)))
-  const pagLabel = { DINHEIRO: 'Dinheiro', MAQUINA: 'Cartão/QR', PIX: 'Pix' }
-  lines.push(center(`Pagamento: ${pagLabel[p.formaPagamento] || p.formaPagamento}`))
-  if (p.trocoPara) lines.push(`Troco para: ${fmt(p.trocoPara)}`)
+  if (p.pago) {
+    lines.push(center('✔✔ PAGO ✔✔'))
+  } else {
+    const pagLabel = { DINHEIRO: 'Dinheiro', MAQUINA: 'Cartão/QR', PIX: 'Pix' }
+    lines.push(center(`Pagamento: ${pagLabel[p.formaPagamento] || p.formaPagamento}`))
+    if (p.trocoPara) lines.push(`Troco para: ${fmt(p.trocoPara)}`)
+  }
   lines.push(line)
 
   return lines.join('\n')
