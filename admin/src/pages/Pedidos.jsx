@@ -40,6 +40,27 @@ const STATUS = {
 
 const PAG = { DINHEIRO: '💵 Dinheiro', MAQUINA: '💳 Cartão/QR', PIX: '📱 Pix' }
 
+// Ordem de exibição na lista principal: sem flag > saiu > impresso > avisado > finalizado > cancelado
+const GRUPO_ORDEM = ['none', 'saiu', 'impresso', 'avisado', 'finalizado', 'cancelado']
+
+function grupoPedido(p) {
+  if (p.status === 'CANCELADO') return 'cancelado'
+  if (p.finalizado) return 'finalizado'
+  if (p.saiuEntrega) return 'saiu'
+  if (p.impresso) return 'impresso'
+  if (p.avisado) return 'avisado'
+  return 'none'
+}
+
+function ordenarPedidos(lista) {
+  return [...lista].sort((a, b) => {
+    const ga = GRUPO_ORDEM.indexOf(grupoPedido(a))
+    const gb = GRUPO_ORDEM.indexOf(grupoPedido(b))
+    if (ga !== gb) return ga - gb
+    return a.numeroDia - b.numeroDia
+  })
+}
+
 function today() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
 }
@@ -95,22 +116,22 @@ body{font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:bold
 .row span:first-child{flex:1}
 .sec{margin-top:4px}
 </style></head><body>
-<div class="center bold" style="font-size:15px">SORVETERIA DUBON</div>
-<div class="center bold">Pedido #${pedido.numeroDia}</div>
+<div class="center bold" style="font-size:32px;line-height:1.1">#${pedido.numeroDia}</div>
+${pedido.pago ? `<div class="center bold" style="font-size:12px;margin-top:1px">✔ PAGO</div>` : ''}
+<div class="center bold" style="font-size:14px;margin-top:2px">SORVETERIA DUBON</div>
 ${pedido.clienteNome ? `<div class="center bold">Cliente: ${pedido.clienteNome}</div>` : ''}
 <div class="center">${dt}</div>
 <div class="div"></div>
 ${itensHTML}
 <div class="div"></div>
 ${Number(pedido.taxaEntrega) > 0 ? `<div class="row"><span>Taxa entrega</span><span>${fmt(pedido.taxaEntrega)}</span></div>` : ''}
-<div class="row bold"><span>TOTAL</span><span>${fmt(pedido.total)}</span></div>
 ${parcialHTML}
 <div class="div"></div>
 ${enderecoHTML}
 <div class="div"></div>
-<div class="bold">Pagamento: ${pagLabel[pedido.formaPagamento] || pedido.formaPagamento}</div>
-${pedido.trocoPara ? `<div>Troco para: ${fmt(pedido.trocoPara)}</div>` : ''}
-${pedido.pago ? `<div class="div"></div><div class="center bold" style="font-size:15px">✔ PAGO</div>` : ''}
+<div class="row bold" style="font-size:17px"><span>TOTAL</span><span>${fmt(pedido.total)}</span></div>
+<div class="center bold" style="font-size:15px;margin-top:2px">${pagLabel[pedido.formaPagamento] || pedido.formaPagamento}</div>
+${pedido.trocoPara ? `<div class="center" style="font-size:11px">Troco para: ${fmt(pedido.trocoPara)}</div>` : ''}
 </body></html>`
 }
 
@@ -148,6 +169,7 @@ export default function Pedidos() {
   const [editSaving, setEditSaving] = useState(false)
   const [produtos, setProdutos] = useState([])
   const [newItem, setNewItem] = useState({ produtoId: '', qtd: 1, preco: '' })
+  const [highlightId, setHighlightId] = useState(null)
   const prevOrderIds = useRef(null)
 
   const fetchPedidos = useCallback(async () => {
@@ -322,9 +344,19 @@ export default function Pedidos() {
 
   const pedidosAtivos = pedidos.filter((p) => p.status !== 'CANCELADO')
   const receita = pedidosAtivos.reduce((s, p) => s + Number(p.total), 0)
+  const pedidosOrdenados = ordenarPedidos(pedidos)
+  const pedidosSidebar = [...pedidos].sort((a, b) => b.numeroDia - a.numeroDia)
+
+  const scrollToPedido = (id) => {
+    const el = document.getElementById(`pedido-${id}`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setHighlightId(id)
+    setTimeout(() => setHighlightId((h) => (h === id ? null : h)), 1500)
+  }
 
   return (
-    <div>
+    <div className="lg:flex lg:items-start lg:gap-6">
+      <div className="flex-1 min-w-0">
       {/* ── Cabeçalho ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div>
@@ -371,10 +403,11 @@ export default function Pedidos() {
         </div>
       ) : (
         <div className="space-y-4">
-          {pedidos.map((p) => (
+          {pedidosOrdenados.map((p) => (
             <PedidoCard
               key={p.id}
               pedido={p}
+              highlighted={p.id === highlightId}
               onFlag={handleFlag}
               onStatus={handleStatus}
               onPagamentoParcial={handlePagamentoParcial}
@@ -384,6 +417,30 @@ export default function Pedidos() {
             />
           ))}
         </div>
+      )}
+      </div>
+
+      {/* ── Atalho lateral: todos os pedidos do dia ── */}
+      {!loading && pedidosSidebar.length > 0 && (
+        <aside className="mt-6 lg:mt-0 lg:w-60 lg:shrink-0 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto bg-white rounded-xl border border-gray-200 p-3">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">
+            Pedidos do dia
+          </h2>
+          <ul className="space-y-0.5">
+            {pedidosSidebar.map((p) => (
+              <li key={p.id}>
+                <button
+                  onClick={() => scrollToPedido(p.id)}
+                  className="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 truncate"
+                >
+                  <span className="font-semibold text-brand">{p.numeroDia}</span>
+                  {' - '}
+                  {p.clienteNome || '—'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </aside>
       )}
 
       {/* ── Modal de edição ── */}
@@ -671,7 +728,7 @@ export default function Pedidos() {
 }
 
 /* ── Card de pedido ── */
-function PedidoCard({ pedido: p, onFlag, onStatus, onPagamentoParcial, onMsg, onPrint, onEdit }) {
+function PedidoCard({ pedido: p, highlighted, onFlag, onStatus, onPagamentoParcial, onMsg, onPrint, onEdit }) {
   const [parcialOpen, setParcialOpen] = useState(false)
   const [parcialInput, setParcialInput] = useState('')
 
@@ -684,11 +741,11 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onPagamentoParcial, onMsg, on
   // Priority: cancelado > finalizado > saiu > impresso > avisado > pago > default
   const cardStyle = (() => {
     if (isCanceled)    return { bg: 'bg-gray-200 border-gray-400', wm: 'CANCELADO', wmColor: '#374151' }
-    if (p.finalizado)  return { bg: 'bg-red-100 border-red-400', wm: 'FINALIZADO', wmColor: '#b91c1c' }
-    if (p.saiuEntrega) return { bg: 'bg-green-100 border-green-400', wm: 'SAIU', wmColor: '#15803d' }
-    if (p.impresso)    return { bg: 'bg-blue-100 border-blue-400', wm: 'IMPRESSO', wmColor: '#1d4ed8' }
-    if (p.avisado)     return { bg: 'bg-purple-100 border-purple-400', wm: 'AVISADO', wmColor: '#7e22ce' }
-    if (p.pago)        return { bg: 'bg-amber-100 border-amber-400', wm: 'PAGO', wmColor: '#b45309' }
+    if (p.finalizado)  return { bg: 'bg-red-200 border-red-600', wm: 'FINALIZADO', wmColor: '#b91c1c' }
+    if (p.saiuEntrega) return { bg: 'bg-green-200 border-green-600', wm: 'SAIU', wmColor: '#15803d' }
+    if (p.impresso)    return { bg: 'bg-blue-200 border-blue-600', wm: 'IMPRESSO', wmColor: '#1d4ed8' }
+    if (p.avisado)     return { bg: 'bg-purple-200 border-purple-600', wm: 'AVISADO', wmColor: '#7e22ce' }
+    if (p.pago)        return { bg: 'bg-amber-200 border-amber-600', wm: 'PAGO', wmColor: '#b45309' }
     return { bg: 'bg-white border-gray-200', wm: null }
   })()
 
@@ -715,7 +772,10 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onPagamentoParcial, onMsg, on
 
   return (
     <div
-      className={`${cardStyle.bg} rounded-xl border shadow-sm overflow-hidden transition-colors relative`}
+      id={`pedido-${p.id}`}
+      className={`${cardStyle.bg} rounded-xl border shadow-sm overflow-hidden transition-colors relative ${
+        highlighted ? 'ring-4 ring-brand ring-offset-2' : ''
+      }`}
       style={isCanceled ? { filter: 'grayscale(0.6)' } : undefined}
     >
       {/* Marca d'água diagonal */}
@@ -731,7 +791,7 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onPagamentoParcial, onMsg, on
               letterSpacing: '0.05em',
               textTransform: 'uppercase',
               color: cardStyle.wmColor,
-              opacity: 0.12,
+              opacity: 0.18,
               transform: 'rotate(-30deg)',
               whiteSpace: 'nowrap',
               userSelect: 'none',
@@ -754,6 +814,15 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onPagamentoParcial, onMsg, on
           <span className="text-xs text-gray-400">
             {new Date(p.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}
           </span>
+          <label className={`flex items-center gap-1 text-xs font-semibold cursor-pointer select-none ${p.pago ? 'text-amber-700' : 'text-gray-400'}`}>
+            <input
+              type="checkbox"
+              checked={!!p.pago}
+              onChange={(e) => onFlag(p.id, 'pago', e.target.checked)}
+              className="w-3.5 h-3.5 accent-amber-600 rounded"
+            />
+            Pago
+          </label>
         </div>
         <div className="flex flex-col items-end gap-0.5 shrink-0">
           <span className="font-bold text-brand">{fmt(p.total)}</span>
@@ -788,18 +857,20 @@ function PedidoCard({ pedido: p, onFlag, onStatus, onPagamentoParcial, onMsg, on
       {/* Checkboxes */}
       <div className="flex flex-wrap gap-x-4 gap-y-2 px-4 py-2 border-t border-gray-100 bg-white/50">
         {[
-          { key: 'pago',        label: 'Pago' },
-          { key: 'avisado',     label: 'Avisado' },
-          { key: 'impresso',    label: 'Impresso' },
-          { key: 'saiuEntrega', label: 'Saiu' },
-          { key: 'finalizado',  label: 'Finalizado' },
-        ].map(({ key, label }) => (
-          <label key={key} className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+          { key: 'avisado',     label: 'Avisado',    accent: 'accent-purple-600', text: 'text-purple-700' },
+          { key: 'impresso',    label: 'Impresso',   accent: 'accent-blue-600',   text: 'text-blue-700' },
+          { key: 'saiuEntrega', label: 'Saiu',        accent: 'accent-green-600',  text: 'text-green-700' },
+          { key: 'finalizado',  label: 'Finalizado', accent: 'accent-red-600',    text: 'text-red-700' },
+        ].map(({ key, label, accent, text }) => (
+          <label
+            key={key}
+            className={`flex items-center gap-1.5 text-sm cursor-pointer select-none ${p[key] ? `${text} font-semibold` : 'text-gray-500'}`}
+          >
             <input
               type="checkbox"
               checked={!!p[key]}
               onChange={(e) => onFlag(p.id, key, e.target.checked)}
-              className="w-4 h-4 accent-brand rounded"
+              className={`w-4 h-4 rounded ${accent}`}
             />
             {label}
           </label>
@@ -923,9 +994,11 @@ function gerarReciboTexto(p) {
 
   const lines = [
     line,
-    center('SORVETERIA DUBON'),
-    center(`Pedido #${p.numeroDia}`),
+    center(`#${p.numeroDia}`),
+    line,
   ]
+  if (p.pago) lines.push(center('✔ PAGO'))
+  lines.push(center('SORVETERIA DUBON'))
   if (p.clienteNome) lines.push(center(`Cliente: ${p.clienteNome}`))
   lines.push(center(dt))
   lines.push(line)
@@ -947,16 +1020,14 @@ function gerarReciboTexto(p) {
 
   lines.push(dash)
   if (Number(p.taxaEntrega) > 0) lines.push(rowLR('Taxa entrega:', fmt(p.taxaEntrega)))
-  lines.push(rowLR('TOTAL:', fmt(p.total)))
 
   const parcial = Number(p.pagamentoParcial || 0)
   if (parcial > 0) {
-    lines.push(dash)
     lines.push(rowLR('Pago (parcial):', fmt(parcial)))
     lines.push(rowLR('RESTANTE:', fmt(Math.max(0, Number(p.total) - parcial))))
   }
 
-  lines.push(line)
+  lines.push(dash)
 
   if (p.tipoEntrega === 'ENTREGA') {
     lines.push('ENTREGA:')
@@ -967,11 +1038,11 @@ function gerarReciboTexto(p) {
     lines.push(center('*** RETIRADA NA LOJA ***'))
   }
 
-  lines.push(dash)
+  lines.push(line)
+  lines.push(rowLR('TOTAL:', fmt(p.total)))
   const pagLabel = { DINHEIRO: 'Dinheiro', MAQUINA: 'Cartão/QR', PIX: 'Pix' }
-  lines.push(`Pagamento: ${pagLabel[p.formaPagamento] || p.formaPagamento}`)
+  lines.push(center(`Pagamento: ${pagLabel[p.formaPagamento] || p.formaPagamento}`))
   if (p.trocoPara) lines.push(`Troco para: ${fmt(p.trocoPara)}`)
-  if (p.pago) { lines.push(line); lines.push(center('✔ PAGO')) }
   lines.push(line)
 
   return lines.join('\n')
